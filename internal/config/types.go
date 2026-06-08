@@ -108,9 +108,14 @@ type ToolsConfig struct {
 }
 
 type MCPServerConfig struct {
-	ID      string `json:"id"`
-	Enabled bool   `json:"enabled"`
-	URL     string `json:"url,omitempty"`
+	ID             string            `json:"id"`
+	Enabled        bool              `json:"enabled"`
+	Transport      string            `json:"transport,omitempty"`
+	URL            string            `json:"url,omitempty"`
+	Command        string            `json:"command,omitempty"`
+	Args           []string          `json:"args,omitempty"`
+	Env            map[string]string `json:"env,omitempty"`
+	TimeoutSeconds int               `json:"timeout_seconds,omitempty"`
 }
 
 type ShellToolConfig struct {

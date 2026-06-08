@@ -1,11 +1,16 @@
 package tools
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"net/http"
+	"os"
+	"os/exec"
 	"strings"
 	"time"
 
@@ -16,6 +21,9 @@ import (
 const (
 	mcpToolPrefix        = "mcp"
 	defaultMCPHTTPClient = 10 * time.Second
+	defaultMCPStdioCall  = 15 * time.Second
+	mcpTransportHTTP     = "http"
+	mcpTransportStdio    = "stdio"
 )
 
 type MCPClient struct {
@@ -105,6 +113,21 @@ func (c *MCPClient) Execute(ctx context.Context, toolName, argsJSON string) (str
 }
 
 func (c *MCPClient) call(ctx context.Context, method string, params map[string]any, out any) error {
+	transport := strings.ToLower(strings.TrimSpace(c.server.Transport))
+	if transport == "" {
+		if c.server.Command != "" {
+			transport = mcpTransportStdio
+		} else {
+			transport = mcpTransportHTTP
+		}
+	}
+	if transport == mcpTransportStdio {
+		return c.callStdio(ctx, method, params, out)
+	}
+	return c.callHTTP(ctx, method, params, out)
+}
+
+func (c *MCPClient) callHTTP(ctx context.Context, method string, params map[string]any, out any) error {
 	if c.server.URL == "" {
 		return fmt.Errorf("mcp server %s missing url", c.server.ID)
 	}
@@ -148,6 +171,147 @@ func (c *MCPClient) call(ctx context.Context, method string, params map[string]a
 		return nil
 	}
 	return json.Unmarshal(payload.Result, out)
+}
+
+func (c *MCPClient) callStdio(ctx context.Context, method string, params map[string]any, out any) error {
+	if c.server.Command == "" {
+		return fmt.Errorf("mcp server %s missing command", c.server.ID)
+	}
+	timeout := defaultMCPStdioCall
+	if c.server.TimeoutSeconds > 0 {
+		timeout = time.Duration(c.server.TimeoutSeconds) * time.Second
+	}
+	callCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	cmd := exec.CommandContext(callCtx, c.server.Command, c.server.Args...)
+	if len(c.server.Env) > 0 {
+		cmd.Env = append(os.Environ(), envPairs(c.server.Env)...)
+	}
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		return err
+	}
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return err
+	}
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+	defer func() {
+		_ = stdin.Close()
+		if cmd.Process != nil {
+			_ = cmd.Process.Kill()
+		}
+		_ = cmd.Wait()
+	}()
+
+	scanner := bufio.NewScanner(stdout)
+	scanner.Buffer(make([]byte, 0, 64*1024), 8*1024*1024)
+	if err := writeMCPMessage(stdin, map[string]any{
+		"jsonrpc": "2.0",
+		"id":      1,
+		"method":  "initialize",
+		"params": map[string]any{
+			"protocolVersion": "2025-06-18",
+			"capabilities":    map[string]any{},
+			"clientInfo": map[string]any{
+				"name":    "vietclaw",
+				"version": "dev",
+			},
+		},
+	}); err != nil {
+		return err
+	}
+	if _, err := readMCPResponse(scanner, 1); err != nil {
+		return withStderr(c.server.ID, err, stderr.String())
+	}
+	if err := writeMCPMessage(stdin, map[string]any{
+		"jsonrpc": "2.0",
+		"method":  "notifications/initialized",
+		"params":  map[string]any{},
+	}); err != nil {
+		return err
+	}
+	if err := writeMCPMessage(stdin, map[string]any{
+		"jsonrpc": "2.0",
+		"id":      2,
+		"method":  method,
+		"params":  params,
+	}); err != nil {
+		return err
+	}
+	result, err := readMCPResponse(scanner, 2)
+	if err != nil {
+		return withStderr(c.server.ID, err, stderr.String())
+	}
+	if out == nil {
+		return nil
+	}
+	return json.Unmarshal(result, out)
+}
+
+func writeMCPMessage(stdin io.Writer, payload map[string]any) error {
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+	data = append(data, '\n')
+	_, err = stdin.Write(data)
+	return err
+}
+
+func readMCPResponse(scanner *bufio.Scanner, id int) (json.RawMessage, error) {
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" {
+			continue
+		}
+		var payload struct {
+			ID     int             `json:"id"`
+			Result json.RawMessage `json:"result"`
+			Error  struct {
+				Message string `json:"message"`
+			} `json:"error"`
+			Method string `json:"method"`
+		}
+		if err := json.Unmarshal([]byte(line), &payload); err != nil {
+			return nil, err
+		}
+		if payload.ID != id {
+			continue
+		}
+		if payload.Error.Message != "" {
+			return nil, errors.New(payload.Error.Message)
+		}
+		return payload.Result, nil
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, err
+	}
+	return nil, fmt.Errorf("mcp stdio response %d not found", id)
+}
+
+func envPairs(values map[string]string) []string {
+	pairs := make([]string, 0, len(values))
+	for key, value := range values {
+		if strings.TrimSpace(key) == "" {
+			continue
+		}
+		pairs = append(pairs, key+"="+value)
+	}
+	return pairs
+}
+
+func withStderr(serverID string, err error, stderr string) error {
+	stderr = strings.TrimSpace(stderr)
+	if stderr == "" {
+		return err
+	}
+	return fmt.Errorf("mcp server %s: %w; stderr: %s", serverID, err, stderr)
 }
 
 func mcpToolName(serverID, toolName string) string {
