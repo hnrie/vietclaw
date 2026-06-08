@@ -114,6 +114,9 @@ func mergeRouter(cfg RouterConfig, def RouterConfig) RouterConfig {
 	if cfg.DefaultModel == "" {
 		cfg.DefaultModel = def.DefaultModel
 	}
+	if cfg.IntentMode == "" {
+		cfg.IntentMode = def.IntentMode
+	}
 	if !cfg.CheapFirst {
 		cfg.CheapFirst = def.CheapFirst
 	}

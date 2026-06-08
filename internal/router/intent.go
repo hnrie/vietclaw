@@ -17,13 +17,37 @@ func Classify(message string) Intent {
 	switch {
 	case text == "":
 		return IntentUnknown
-	case strings.Contains(text, "nhớ là") || strings.Contains(text, "từ nay") || strings.Contains(text, "lưu lại"):
+	case containsAny(text, "nhớ là", "từ nay", "lưu lại", "remember that", "save this", "note that"):
 		return IntentMemoryAdd
-	case strings.Contains(text, "mày nhớ gì") || strings.Contains(text, "nhớ gì") || strings.Contains(text, "server chính") || strings.Contains(text, "đã lưu"):
+	case containsAny(text, "mày nhớ gì", "nhớ gì", "server chính", "đã lưu", "what do you remember", "recall", "saved memory"):
 		return IntentMemoryQuery
-	case strings.HasPrefix(text, "chạy ") || strings.Contains(text, "đọc file") || strings.Contains(text, "ghi file"):
+	case strings.HasPrefix(text, "chạy ") || containsAny(text, "đọc file", "ghi file", "run ", "read file", "write file"):
 		return IntentAction
 	default:
 		return IntentChat
 	}
+}
+
+func ParseIntent(value string) Intent {
+	switch Intent(strings.ToLower(strings.TrimSpace(value))) {
+	case IntentMemoryAdd:
+		return IntentMemoryAdd
+	case IntentMemoryQuery:
+		return IntentMemoryQuery
+	case IntentAction:
+		return IntentAction
+	case IntentChat:
+		return IntentChat
+	default:
+		return IntentUnknown
+	}
+}
+
+func containsAny(text string, needles ...string) bool {
+	for _, needle := range needles {
+		if strings.Contains(text, needle) {
+			return true
+		}
+	}
+	return false
 }

@@ -28,7 +28,7 @@ func (s *Service) Chat(ctx context.Context, req ChatRequest) (ChatResponse, erro
 		return ChatResponse{}, err
 	}
 
-	intent := router.Classify(req.Message)
+	intent := s.router.Classify(ctx, req.Message, s.Language())
 	runID := newID("run")
 	if err := s.insertRun(ctx, runID, req.SessionID, string(intent), "", "", RunStatusRunning, ""); err != nil {
 		return ChatResponse{}, err

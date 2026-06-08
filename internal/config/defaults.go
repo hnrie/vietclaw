@@ -31,6 +31,7 @@ const (
 	DefaultProviderType  = "mock"
 	DefaultProviderModel = "mock-small"
 	DefaultEmbedModel    = "text-embedding-3-small"
+	DefaultIntentMode    = "hybrid"
 
 	DefaultDailyUSDLimit           = 0.25
 	DefaultRequireApprovalAboveUSD = 0.05
@@ -89,6 +90,7 @@ func Default(paths Paths) Config {
 		Router: RouterConfig{
 			DefaultProvider: DefaultProviderID,
 			DefaultModel:    DefaultProviderModel,
+			IntentMode:      DefaultIntentMode,
 			CheapFirst:      true,
 			AllowEscalation: true,
 		},

@@ -17,12 +17,23 @@ func TestClassify(t *testing.T) {
 		"mày nhớ gì về server chính":      router.IntentMemoryQuery,
 		"chạy ls":                         router.IntentAction,
 		"mày là gì":                       router.IntentChat,
+		"remember that I use SQLite":      router.IntentMemoryAdd,
+		"read file config.json":           router.IntentAction,
 		"":                                router.IntentUnknown,
 	}
 	for input, want := range tests {
 		if got := router.Classify(input); got != want {
 			t.Fatalf("Classify(%q) = %s, want %s", input, got, want)
 		}
+	}
+}
+
+func TestRouterHybridFallsBackToRuleWithMockProvider(t *testing.T) {
+	cfg := config.Default(config.Paths{DataDir: t.TempDir()})
+	cfg.Router.IntentMode = config.DefaultIntentMode
+	r := router.NewModelRouter(cfg, nil, providers.Enabled(cfg.Providers))
+	if got := r.Classify(context.Background(), "hello there", "en"); got != router.IntentChat {
+		t.Fatalf("hybrid classify = %s", got)
 	}
 }
 

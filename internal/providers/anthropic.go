@@ -1,10 +1,12 @@
 package providers
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"strings"
@@ -84,15 +86,46 @@ func (p *Anthropic) Chat(ctx context.Context, req ChatRequest) (ChatResponse, er
 	}, nil
 }
 func (p *Anthropic) ChatStream(ctx context.Context, req ChatRequest) (<-chan StreamChunk, error) {
-	ch := make(chan StreamChunk, 2)
+	apiKey := os.Getenv(p.cfg.APIKeyEnv)
+	if p.cfg.APIKeyEnv != "" && apiKey == "" {
+		return nil, fmt.Errorf("missing api key env %s", p.cfg.APIKeyEnv)
+	}
+	body := anthropicRequestFromChat(req, defaultString(req.Model, p.cfg.DefaultModel))
+	body.Stream = true
+	encoded, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	baseURL := strings.TrimRight(p.cfg.BaseURL, "/")
+	if baseURL == "" {
+		return nil, fmt.Errorf("missing base_url")
+	}
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, baseURL+anthropicMessagesPath, bytes.NewReader(encoded))
+	if err != nil {
+		return nil, err
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("anthropic-version", anthropicVersion)
+	if apiKey != "" {
+		httpReq.Header.Set("x-api-key", apiKey)
+	}
+
+	resp, err := p.client.Do(httpReq)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode >= http.StatusBadRequest {
+		defer resp.Body.Close()
+		var payload anthropicResponse
+		_ = json.NewDecoder(resp.Body).Decode(&payload)
+		return nil, fmt.Errorf("provider returned %s: %s", resp.Status, payload.Error.Message)
+	}
+
+	ch := make(chan StreamChunk, 32)
 	go func() {
+		defer resp.Body.Close()
 		defer close(ch)
-		resp, err := p.Chat(ctx, req)
-		if err != nil {
-			ch <- StreamChunk{Error: err.Error()}
-			return
-		}
-		ch <- StreamChunk{Text: resp.Text, ToolCalls: resp.ToolCalls}
+		readAnthropicStream(resp.Body, ch)
 		ch <- StreamChunk{Done: true}
 	}()
 	return ch, nil
@@ -141,6 +174,7 @@ type anthropicRequest struct {
 	Messages    []anthropicMessage `json:"messages"`
 	MaxTokens   int                `json:"max_tokens"`
 	Temperature float64            `json:"temperature,omitempty"`
+	Stream      bool               `json:"stream,omitempty"`
 }
 
 type anthropicMessage struct {
@@ -170,4 +204,49 @@ func (r anthropicResponse) Text() string {
 		}
 	}
 	return strings.Join(parts, "\n")
+}
+
+func readAnthropicStream(body io.Reader, ch chan<- StreamChunk) {
+	reader := bufio.NewReader(body)
+	for {
+		line, err := reader.ReadString('\n')
+		if err != nil {
+			if err != io.EOF {
+				ch <- StreamChunk{Error: err.Error()}
+			}
+			return
+		}
+		line = strings.TrimSpace(line)
+		if !strings.HasPrefix(line, "data: ") {
+			continue
+		}
+		data := strings.TrimPrefix(line, "data: ")
+		if data == "[DONE]" {
+			return
+		}
+		var event struct {
+			Type  string `json:"type"`
+			Delta struct {
+				Type string `json:"type"`
+				Text string `json:"text"`
+			} `json:"delta"`
+			Error struct {
+				Message string `json:"message"`
+			} `json:"error"`
+		}
+		if err := json.Unmarshal([]byte(data), &event); err != nil {
+			continue
+		}
+		switch event.Type {
+		case "content_block_delta":
+			if event.Delta.Text != "" {
+				ch <- StreamChunk{Text: event.Delta.Text}
+			}
+		case "error":
+			ch <- StreamChunk{Error: event.Error.Message}
+			return
+		case "message_stop":
+			return
+		}
+	}
 }

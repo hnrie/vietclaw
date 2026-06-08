@@ -29,6 +29,9 @@ func TestDefaultIncludesAgentRuntime(t *testing.T) {
 	if cfg.Router.DefaultProvider != "mock" || cfg.Router.DefaultModel != "mock-small" {
 		t.Fatalf("router default invalid: %#v", cfg.Router)
 	}
+	if cfg.Router.IntentMode != config.DefaultIntentMode {
+		t.Fatalf("router intent mode = %q", cfg.Router.IntentMode)
+	}
 	if cfg.Tools.Shell.Enabled {
 		t.Fatal("shell must be disabled by default")
 	}

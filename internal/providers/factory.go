@@ -16,6 +16,8 @@ func New(cfg config.ProviderConfig) Provider {
 		return NewOpenAICompatible(cfg, client)
 	case TypeAnthropic:
 		return NewAnthropic(cfg, client)
+	case TypeGemini:
+		return NewGemini(cfg, client)
 	case TypeCustomHTTP:
 		return NewCustomHTTP(cfg, client)
 	case TypeOpenCodeCLI:

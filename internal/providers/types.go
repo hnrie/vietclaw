@@ -11,6 +11,7 @@ const (
 	TypeOpenAICompatible = "openai-compatible"
 	TypeOpenAI           = "openai"
 	TypeAnthropic        = "anthropic"
+	TypeGemini           = "gemini"
 	TypeCustomHTTP       = "http"
 	TypeOpenCodeCLI      = "opencode-cli"
 

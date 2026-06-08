@@ -3,7 +3,9 @@ package router
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
+	"strings"
 
 	"vietclaw/internal/config"
 	"vietclaw/internal/providers"
@@ -23,6 +25,30 @@ type Selection struct {
 
 func NewModelRouter(cfg config.Config, db *sql.DB, available []providers.Provider) *ModelRouter {
 	return &ModelRouter{cfg: cfg, providers: available, db: db}
+}
+
+func (r *ModelRouter) Classify(ctx context.Context, message, language string) Intent {
+	ruleIntent := Classify(message)
+	mode := strings.ToLower(strings.TrimSpace(r.cfg.Router.IntentMode))
+	if mode == "" {
+		mode = config.DefaultIntentMode
+	}
+	if mode == "rule" {
+		return ruleIntent
+	}
+	if mode == "hybrid" && ruleIntent != IntentChat && ruleIntent != IntentUnknown {
+		return ruleIntent
+	}
+
+	provider := r.defaultProvider(nil)
+	if provider == nil || provider.Type() == providers.TypeMock {
+		return ruleIntent
+	}
+	intent, err := classifyWithProvider(ctx, provider, r.defaultModel(provider), message, language)
+	if err != nil || intent == IntentUnknown {
+		return ruleIntent
+	}
+	return intent
 }
 
 func (r *ModelRouter) Select(ctx context.Context, req providers.ChatRequest, excludeIDs []string) (Selection, error) {
@@ -49,4 +75,39 @@ func (r *ModelRouter) SelectDefaultEmbedder() providers.Provider {
 		}
 	}
 	return nil
+}
+
+func classifyWithProvider(ctx context.Context, provider providers.Provider, model, message, language string) (Intent, error) {
+	resp, err := provider.Chat(ctx, providers.ChatRequest{
+		Model:           model,
+		MaxOutputTokens: 32,
+		Temperature:     0,
+		Messages: []providers.Message{
+			{
+				Role: "system",
+				Content: "Classify the user message into exactly one intent: memory_add, memory_query, action, chat, unknown. " +
+					"Return compact JSON only: {\"intent\":\"...\"}. Language hint: " + language,
+			},
+			{Role: "user", Content: message},
+		},
+	})
+	if err != nil {
+		return IntentUnknown, err
+	}
+	return parseIntentResponse(resp.Text), nil
+}
+
+func parseIntentResponse(text string) Intent {
+	var payload struct {
+		Intent string `json:"intent"`
+	}
+	if err := json.Unmarshal([]byte(strings.TrimSpace(text)), &payload); err == nil {
+		return ParseIntent(payload.Intent)
+	}
+	for _, intent := range []Intent{IntentMemoryAdd, IntentMemoryQuery, IntentAction, IntentChat, IntentUnknown} {
+		if strings.Contains(strings.ToLower(text), string(intent)) {
+			return intent
+		}
+	}
+	return IntentUnknown
 }
