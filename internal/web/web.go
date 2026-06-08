@@ -9,6 +9,7 @@ import (
 
 	"vietclaw/internal/agent"
 	"vietclaw/internal/app"
+	"vietclaw/internal/channels"
 	"vietclaw/internal/db"
 	"vietclaw/internal/memory"
 	"vietclaw/internal/providers"
@@ -30,6 +31,9 @@ func NewRouter(application *app.App) http.Handler {
 	mux.HandleFunc("GET /api/sessions/{id}", handleSessionDetail(application))
 	mux.HandleFunc("GET /api/costs/today", handleCostsToday(application))
 	mux.HandleFunc("GET /api/providers", handleProviders(application))
+	mux.HandleFunc("GET /api/channels", handleChannels(application))
+	mux.HandleFunc("POST /api/channels/discord/test", handleDiscordTest(application))
+	mux.HandleFunc("POST /api/channels/telegram/test", handleTelegramTest(application))
 	return mux
 }
 
@@ -181,6 +185,38 @@ func handleCostsToday(application *app.App) http.HandlerFunc {
 func handleProviders(application *app.App) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, providers.Redact(application.Config.Providers))
+	}
+}
+
+func handleChannels(application *app.App) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if application.Channels != nil {
+			writeJSON(w, http.StatusOK, application.Channels.Statuses())
+			return
+		}
+		writeJSON(w, http.StatusOK, channels.StatusFromConfig(application.Config))
+	}
+}
+
+func handleDiscordTest(application *app.App) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, http.StatusOK, channelEnvStatus("discord", application.Config.Channels.Discord.Enabled, application.Config.Channels.Discord.TokenEnv))
+	}
+}
+
+func handleTelegramTest(application *app.App) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, http.StatusOK, channelEnvStatus("telegram", application.Config.Channels.Telegram.Enabled, application.Config.Channels.Telegram.TokenEnv))
+	}
+}
+
+func channelEnvStatus(name string, enabled bool, tokenEnv string) map[string]any {
+	_, ok := os.LookupEnv(tokenEnv)
+	return map[string]any{
+		"name":      name,
+		"enabled":   enabled,
+		"token_env": tokenEnv,
+		"env_found": ok,
 	}
 }
 

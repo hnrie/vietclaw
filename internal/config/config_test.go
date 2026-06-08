@@ -27,6 +27,12 @@ func TestDefaultIncludesAgentRuntime(t *testing.T) {
 	if !cfg.Tools.Files.Enabled || !cfg.Tools.Files.WorkspaceOnly {
 		t.Fatalf("file tools default invalid: %#v", cfg.Tools.Files)
 	}
+	if cfg.Channels.Discord.TokenEnv != "VIETCLAW_DISCORD_TOKEN" || cfg.Channels.Discord.RespondInGuilds != "mention_or_reply" || !cfg.Channels.Discord.RespondInDM {
+		t.Fatalf("discord default invalid: %#v", cfg.Channels.Discord)
+	}
+	if cfg.Channels.Telegram.TokenEnv != "VIETCLAW_TELEGRAM_TOKEN" || cfg.Channels.Telegram.RespondInGroups != "mention_or_reply" || !cfg.Channels.Telegram.RespondInPrivate || cfg.Channels.Telegram.PollTimeoutSeconds != 30 {
+		t.Fatalf("telegram default invalid: %#v", cfg.Channels.Telegram)
+	}
 }
 
 func TestMergeDefaultKeepsExistingValues(t *testing.T) {

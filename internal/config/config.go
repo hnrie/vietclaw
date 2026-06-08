@@ -53,12 +53,26 @@ type AgentConfig struct {
 }
 
 type ChannelsConfig struct {
-	Discord  ChannelConfig `json:"discord"`
-	Telegram ChannelConfig `json:"telegram"`
+	Discord  DiscordConfig  `json:"discord"`
+	Telegram TelegramConfig `json:"telegram"`
 }
 
-type ChannelConfig struct {
-	Enabled bool `json:"enabled"`
+type DiscordConfig struct {
+	Enabled         bool     `json:"enabled"`
+	TokenEnv        string   `json:"token_env"`
+	AllowedGuilds   []string `json:"allowed_guilds"`
+	AllowedChannels []string `json:"allowed_channels"`
+	RespondInGuilds string   `json:"respond_in_guilds"`
+	RespondInDM     bool     `json:"respond_in_dm"`
+}
+
+type TelegramConfig struct {
+	Enabled            bool     `json:"enabled"`
+	TokenEnv           string   `json:"token_env"`
+	AllowedChats       []string `json:"allowed_chats"`
+	RespondInGroups    string   `json:"respond_in_groups"`
+	RespondInPrivate   bool     `json:"respond_in_private"`
+	PollTimeoutSeconds int      `json:"poll_timeout_seconds"`
 }
 
 type ProviderConfig struct {
@@ -136,8 +150,22 @@ func Default(paths Paths) Config {
 			MaxHistoryMessages: 12,
 		},
 		Channels: ChannelsConfig{
-			Discord:  ChannelConfig{Enabled: false},
-			Telegram: ChannelConfig{Enabled: false},
+			Discord: DiscordConfig{
+				Enabled:         false,
+				TokenEnv:        "VIETCLAW_DISCORD_TOKEN",
+				AllowedGuilds:   []string{},
+				AllowedChannels: []string{},
+				RespondInGuilds: "mention_or_reply",
+				RespondInDM:     true,
+			},
+			Telegram: TelegramConfig{
+				Enabled:            false,
+				TokenEnv:           "VIETCLAW_TELEGRAM_TOKEN",
+				AllowedChats:       []string{},
+				RespondInGroups:    "mention_or_reply",
+				RespondInPrivate:   true,
+				PollTimeoutSeconds: 30,
+			},
 		},
 		Providers: []ProviderConfig{
 			{
@@ -280,6 +308,36 @@ func MergeDefault(cfg Config, def Config) Config {
 	}
 	if cfg.Agent.MaxHistoryMessages == 0 {
 		cfg.Agent.MaxHistoryMessages = def.Agent.MaxHistoryMessages
+	}
+	if cfg.Channels.Discord.TokenEnv == "" {
+		cfg.Channels.Discord.TokenEnv = def.Channels.Discord.TokenEnv
+	}
+	if cfg.Channels.Discord.AllowedGuilds == nil {
+		cfg.Channels.Discord.AllowedGuilds = def.Channels.Discord.AllowedGuilds
+	}
+	if cfg.Channels.Discord.AllowedChannels == nil {
+		cfg.Channels.Discord.AllowedChannels = def.Channels.Discord.AllowedChannels
+	}
+	if cfg.Channels.Discord.RespondInGuilds == "" {
+		cfg.Channels.Discord.RespondInGuilds = def.Channels.Discord.RespondInGuilds
+	}
+	if !cfg.Channels.Discord.RespondInDM {
+		cfg.Channels.Discord.RespondInDM = def.Channels.Discord.RespondInDM
+	}
+	if cfg.Channels.Telegram.TokenEnv == "" {
+		cfg.Channels.Telegram.TokenEnv = def.Channels.Telegram.TokenEnv
+	}
+	if cfg.Channels.Telegram.AllowedChats == nil {
+		cfg.Channels.Telegram.AllowedChats = def.Channels.Telegram.AllowedChats
+	}
+	if cfg.Channels.Telegram.RespondInGroups == "" {
+		cfg.Channels.Telegram.RespondInGroups = def.Channels.Telegram.RespondInGroups
+	}
+	if !cfg.Channels.Telegram.RespondInPrivate {
+		cfg.Channels.Telegram.RespondInPrivate = def.Channels.Telegram.RespondInPrivate
+	}
+	if cfg.Channels.Telegram.PollTimeoutSeconds == 0 {
+		cfg.Channels.Telegram.PollTimeoutSeconds = def.Channels.Telegram.PollTimeoutSeconds
 	}
 	if cfg.Providers == nil || len(cfg.Providers) == 0 {
 		cfg.Providers = def.Providers

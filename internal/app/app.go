@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"vietclaw/internal/agent"
+	"vietclaw/internal/channels"
 	"vietclaw/internal/config"
 	"vietclaw/internal/version"
 )
@@ -19,4 +20,5 @@ type App struct {
 	DataDir   string
 	LogFile   string
 	Agent     *agent.Service
+	Channels  *channels.Manager
 }
