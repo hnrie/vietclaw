@@ -128,7 +128,7 @@ func (s *Service) runAgenticLoop(ctx context.Context, req ChatRequest, runID str
 }
 
 func (s *Service) StreamAgenticLoop(ctx context.Context, req ChatRequest, runID string, intent router.Intent) (<-chan providers.StreamChunk, error) {
-	ch := make(chan providers.StreamChunk, 64)
+	ch := make(chan providers.StreamChunk)
 
 	go func() {
 		defer close(ch)

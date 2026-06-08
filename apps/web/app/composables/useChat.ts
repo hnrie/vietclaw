@@ -10,6 +10,11 @@ export type ChatStepEvent = {
   error?: string
 }
 
+type SSEEvent = {
+  event: string
+  data: string
+}
+
 export type ChatItem = {
   role: 'user' | 'assistant'
   text: string
@@ -131,6 +136,59 @@ function saveConfig(cfg: Record<string, unknown>) {
   localStorage.setItem(CONFIG_KEY, JSON.stringify(cfg))
 }
 
+function parseSSEBlock(block: string): SSEEvent | null {
+  const lines = block.split(/\r?\n/)
+  let event = 'message'
+  const data: string[] = []
+  for (const line of lines) {
+    if (line.startsWith('event:')) {
+      event = line.slice(6).trim()
+    } else if (line.startsWith('data:')) {
+      data.push(line.slice(5).trimStart())
+    }
+  }
+  if (data.length === 0) return null
+  return { event, data: data.join('\n') }
+}
+
+function applySSEEvent(event: SSEEvent, assistantMsg: ChatItem): boolean {
+  if (event.event === 'done') return true
+  if (event.event === 'error') {
+    const parsed = JSON.parse(event.data)
+    assistantMsg.text += `\n\nError: ${parsed.error}`
+    assistantMsg.steps.push({ type: 'error', error: parsed.error })
+    return true
+  }
+
+  const parsed = JSON.parse(event.data)
+  if (event.event === 'tool_call') {
+    assistantMsg.steps.push({
+      type: 'tool_call',
+      toolName: parsed.name,
+      toolInput: parsed.input
+    })
+  } else if (event.event === 'tool_result') {
+    assistantMsg.steps.push({
+      type: 'tool_result',
+      toolName: parsed.name,
+      toolResult: parsed.result
+    })
+  } else if (parsed.text) {
+    assistantMsg.text += parsed.text
+  }
+  return false
+}
+
+function yieldToUI() {
+  return new Promise<void>(resolve => {
+    if (typeof window !== 'undefined' && window.requestAnimationFrame) {
+      window.requestAnimationFrame(() => resolve())
+      return
+    }
+    setTimeout(resolve, 0)
+  })
+}
+
 async function sendMessage(text: string) {
   const s = currentSession()
   if (!s || isGenerating.value) return
@@ -168,51 +226,32 @@ async function sendMessage(text: string) {
 
     const decoder = new TextDecoder()
     let buffer = ''
+    let stop = false
 
-    while (true) {
+    while (!stop) {
       const { done, value } = await reader.read()
-      if (done) break
-
-      buffer += decoder.decode(value, { stream: true })
-      const lines = buffer.split('\n')
-      buffer = lines.pop() || ''
-
-      let currentEvent = ''
-      for (const line of lines) {
-        if (line.startsWith('event: ')) {
-          currentEvent = line.slice(7).trim()
-          continue
-        }
-        if (line.startsWith('data: ')) {
-          const data = line.slice(6).trim()
-          if (currentEvent === 'done') break
-          if (currentEvent === 'error') {
-            const parsed = JSON.parse(data)
-            assistantMsg.text += `\n\nError: ${parsed.error}`
-            assistantMsg.steps.push({ type: 'error', error: parsed.error })
-            break
-          }
-          try {
-            const parsed = JSON.parse(data)
-            if (currentEvent === 'tool_call') {
-              assistantMsg.steps.push({
-                type: 'tool_call',
-                toolName: parsed.name,
-                toolInput: parsed.input
-              })
-            } else if (currentEvent === 'tool_result') {
-              assistantMsg.steps.push({
-                type: 'tool_result',
-                toolName: parsed.name,
-                toolResult: parsed.result
-              })
-            } else if (parsed.text) {
-              assistantMsg.text += parsed.text
-            }
-          } catch {}
-          currentEvent = ''
-        }
+      if (done) {
+        buffer += decoder.decode()
+      } else {
+        buffer += decoder.decode(value, { stream: true })
       }
+
+      const blocks = buffer.split(/\r?\n\r?\n/)
+      buffer = blocks.pop() || ''
+      for (const block of blocks) {
+        const event = parseSSEBlock(block)
+        if (!event) continue
+        try {
+          stop = applySSEEvent(event, assistantMsg)
+          await yieldToUI()
+        } catch {
+          assistantMsg.steps.push({ type: 'error', error: 'Invalid stream event' })
+          stop = true
+        }
+        if (stop) break
+      }
+
+      if (done) break
     }
 
     if (s.sessionId === '' && assistantMsg.text) {
