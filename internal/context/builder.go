@@ -21,7 +21,7 @@ func New(cfg config.Config, db *sql.DB, mem *memory.Store) *Builder {
 	return &Builder{cfg: cfg, db: db, mem: mem}
 }
 
-func (b *Builder) Messages(ctx context.Context, sessionID, userID, userMessage string) ([]providers.Message, error) {
+func (b *Builder) Messages(ctx context.Context, sessionID, userID, userMessage string, embedder providers.Provider) ([]providers.Message, error) {
 	maxChars := b.cfg.Agent.MaxContextChars
 	if maxChars <= 0 {
 		maxChars = config.DefaultMaxContextChars
@@ -35,7 +35,7 @@ func (b *Builder) Messages(ctx context.Context, sessionID, userID, userMessage s
 
 	parts := []string{i18n.T(lang, i18n.SystemPromptBase, agentName)}
 	scope := "user:" + userID
-	memories, _ := b.mem.Search(ctx, scope, userMessage, 6)
+	memories, _ := b.mem.SearchHybrid(ctx, scope, userMessage, 6, embedder)
 	if len(memories) > 0 {
 		lines := []string{i18n.T(lang, i18n.SystemMemoryHeader)}
 		for _, rec := range memories {

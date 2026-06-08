@@ -11,11 +11,23 @@ import (
 
 func (s *Service) handleMemoryAdd(ctx context.Context, req ChatRequest, runID string, intent router.Intent) (ChatResponse, error) {
 	content := cleanMemoryContent(req.Message)
+	embedder := s.router.SelectDefaultEmbedder()
+	var embedding []float32
+	var err error
+	if embedder != nil {
+		embedding, err = embedder.Embed(ctx, content)
+		if err != nil {
+			// fallback without embedding but log error
+			embedding = nil
+		}
+	}
+
 	rec, err := s.mem.Add(ctx, memory.Record{
 		Scope:      "user:" + req.UserID,
 		Kind:       memory.KindNote,
 		Content:    content,
 		Confidence: memory.ConfidenceConfirmed,
+		Embedding:  embedding,
 	})
 	if err != nil {
 		_ = s.finishRun(ctx, runID, RunStatusFailed, err.Error(), ProviderLocal, ModelRule)
@@ -37,7 +49,8 @@ func (s *Service) handleMemoryAdd(ctx context.Context, req ChatRequest, runID st
 
 func (s *Service) handleMemoryQuery(ctx context.Context, req ChatRequest, runID string, intent router.Intent) (ChatResponse, error) {
 	query := cleanMemoryQuery(req.Message)
-	records, err := s.mem.Search(ctx, "user:"+req.UserID, query, 5)
+	embedder := s.router.SelectDefaultEmbedder()
+	records, err := s.mem.SearchHybrid(ctx, "user:"+req.UserID, query, 5, embedder)
 	if err != nil {
 		_ = s.finishRun(ctx, runID, RunStatusFailed, err.Error(), ProviderLocal, ModelRule)
 		return ChatResponse{}, err

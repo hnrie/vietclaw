@@ -36,11 +36,19 @@ func handleMemoryAdd(application *app.App) http.HandlerFunc {
 			writeError(w, http.StatusBadRequest, "invalid json")
 			return
 		}
+
+		embedder := application.Agent.Router().SelectDefaultEmbedder()
+		var embedding []float32
+		if embedder != nil {
+			embedding, _ = embedder.Embed(r.Context(), req.Content)
+		}
+
 		rec, err := application.Agent.Memory().Add(r.Context(), memory.Record{
 			Scope:      req.Scope,
 			Kind:       memory.Kind(req.Kind),
 			Content:    req.Content,
 			Confidence: memory.Confidence(req.Confidence),
+			Embedding:  embedding,
 		})
 		if err != nil {
 			writeError(w, http.StatusBadRequest, err.Error())
@@ -52,7 +60,8 @@ func handleMemoryAdd(application *app.App) http.HandlerFunc {
 
 func handleMemorySearch(application *app.App) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		records, err := application.Agent.Memory().Search(r.Context(), r.URL.Query().Get("scope"), r.URL.Query().Get("q"), defaultMemorySearchLimit)
+		embedder := application.Agent.Router().SelectDefaultEmbedder()
+		records, err := application.Agent.Memory().SearchHybrid(r.Context(), r.URL.Query().Get("scope"), r.URL.Query().Get("q"), defaultMemorySearchLimit, embedder)
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, err.Error())
 			return

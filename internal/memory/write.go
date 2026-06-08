@@ -24,10 +24,15 @@ func (s *Store) Add(ctx context.Context, rec Record) (Record, error) {
 	rec.CreatedAt = now
 	rec.UpdatedAt = now
 
+	var embBytes []byte
+	if len(rec.Embedding) > 0 {
+		embBytes = Float32SliceToBytes(rec.Embedding)
+	}
+
 	result, err := s.db.ExecContext(ctx, `
-INSERT INTO memories (scope, kind, content, confidence, created_at, updated_at)
-VALUES (?, ?, ?, ?, ?, ?)`,
-		rec.Scope, rec.Kind, rec.Content, confidenceValue(rec.Confidence), rec.CreatedAt, rec.UpdatedAt)
+INSERT INTO memories (scope, kind, content, confidence, created_at, updated_at, embedding)
+VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		rec.Scope, rec.Kind, rec.Content, confidenceValue(rec.Confidence), rec.CreatedAt, rec.UpdatedAt, embBytes)
 	if err != nil {
 		return Record{}, fmt.Errorf("add memory: %w", err)
 	}

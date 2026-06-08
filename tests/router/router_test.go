@@ -54,7 +54,7 @@ func TestBudgetRequiresApproval(t *testing.T) {
 	_, err = r.Select(context.Background(), providers.ChatRequest{
 		Messages:        []providers.Message{{Role: "user", Content: "hello"}},
 		MaxOutputTokens: 512,
-	})
+	}, nil)
 	if err == nil {
 		t.Fatal("expected approval error")
 	}

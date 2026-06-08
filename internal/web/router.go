@@ -13,6 +13,7 @@ func NewRouter(application *app.App) http.Handler {
 	mux.HandleFunc("GET /logs/recent", handleRecentLogs(application))
 	mux.HandleFunc("GET /api/logs/recent", handleRecentLogs(application))
 	mux.HandleFunc("POST /api/chat", handleAPIChat(application))
+	mux.HandleFunc("POST /api/chat/stream", handleAPIChatStream(application))
 	mux.HandleFunc("GET /api/memory", handleMemoryList(application))
 	mux.HandleFunc("POST /api/memory", handleMemoryAdd(application))
 	mux.HandleFunc("GET /api/memory/search", handleMemorySearch(application))

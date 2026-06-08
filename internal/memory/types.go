@@ -28,4 +28,5 @@ type Record struct {
 	Confidence Confidence `json:"confidence"`
 	CreatedAt  string     `json:"created_at"`
 	UpdatedAt  string     `json:"updated_at"`
+	Embedding  []float32  `json:"-"`
 }

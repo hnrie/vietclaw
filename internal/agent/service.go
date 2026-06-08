@@ -9,6 +9,7 @@ import (
 	"vietclaw/internal/memory"
 	"vietclaw/internal/providers"
 	"vietclaw/internal/router"
+	"vietclaw/internal/tools"
 )
 
 type Service struct {
@@ -17,6 +18,7 @@ type Service struct {
 	mem     *memory.Store
 	router  *router.ModelRouter
 	context *contextbuilder.Builder
+	tools   *tools.ToolRegistry
 }
 
 func NewService(cfg config.Config, db *sql.DB) *Service {
@@ -28,6 +30,7 @@ func NewService(cfg config.Config, db *sql.DB) *Service {
 		mem:     mem,
 		router:  router.NewModelRouter(cfg, db, providerList),
 		context: contextbuilder.New(cfg, db, mem),
+		tools:   tools.NewRegistry(cfg),
 	}
 }
 
@@ -42,3 +45,8 @@ func (s *Service) Language() string {
 func (s *Service) text(id i18n.MessageID, args ...any) string {
 	return i18n.T(s.cfg.Agent.Language, id, args...)
 }
+
+func (s *Service) Router() *router.ModelRouter {
+	return s.router
+}
+

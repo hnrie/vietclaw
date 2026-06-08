@@ -40,7 +40,15 @@ func runMemory(args []string) error {
 		if len(args) < 2 {
 			return fmt.Errorf("memory add content is required")
 		}
-		rec, err := service.Memory().Add(ctx, memoryRecord(strings.Join(args[1:], " ")))
+		content := strings.Join(args[1:], " ")
+		embedder := service.Router().SelectDefaultEmbedder()
+		var embedding []float32
+		if embedder != nil {
+			embedding, _ = embedder.Embed(ctx, content)
+		}
+		rec := memoryRecord(content)
+		rec.Embedding = embedding
+		rec, err = service.Memory().Add(ctx, rec)
 		if err != nil {
 			return err
 		}
@@ -50,7 +58,8 @@ func runMemory(args []string) error {
 		if len(args) < 2 {
 			return fmt.Errorf("memory search query is required")
 		}
-		records, err := service.Memory().Search(ctx, memoryScopeLocal, strings.Join(args[1:], " "), defaultSearchCLILimit)
+		embedder := service.Router().SelectDefaultEmbedder()
+		records, err := service.Memory().SearchHybrid(ctx, memoryScopeLocal, strings.Join(args[1:], " "), defaultSearchCLILimit, embedder)
 		if err != nil {
 			return err
 		}

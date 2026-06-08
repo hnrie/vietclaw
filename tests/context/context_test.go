@@ -34,7 +34,7 @@ func TestBuilderLimitsContextChars(t *testing.T) {
 	}
 
 	builder := contextbuilder.New(cfg, database, store)
-	messages, err := builder.Messages(context.Background(), "", "local", "token")
+	messages, err := builder.Messages(context.Background(), "", "local", "token", nil)
 	if err != nil {
 		t.Fatal(err)
 	}

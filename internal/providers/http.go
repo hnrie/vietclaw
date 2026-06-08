@@ -58,3 +58,23 @@ func (p *CustomHTTP) EstimateCost(req ChatRequest) CostEstimate {
 		EstimatedCostUSD: EstimateCostUSD(inTokens, outTokens, p.cfg),
 	}
 }
+
+func (p *CustomHTTP) ChatStream(ctx context.Context, req ChatRequest) (<-chan StreamChunk, error) {
+	ch := make(chan StreamChunk, 2)
+	go func() {
+		defer close(ch)
+		resp, err := p.Chat(ctx, req)
+		if err != nil {
+			ch <- StreamChunk{Error: err.Error()}
+			return
+		}
+		ch <- StreamChunk{Text: resp.Text, ToolCalls: resp.ToolCalls}
+		ch <- StreamChunk{Done: true}
+	}()
+	return ch, nil
+}
+
+func (p *CustomHTTP) Embed(ctx context.Context, text string) ([]float32, error) {
+	return nil, fmt.Errorf("embeddings not supported by CustomHTTP provider")
+}
+

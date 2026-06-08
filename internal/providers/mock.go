@@ -43,3 +43,23 @@ func (m *Mock) EstimateCost(req ChatRequest) CostEstimate {
 		EstimatedCostUSD: 0,
 	}
 }
+
+func (m *Mock) ChatStream(ctx context.Context, req ChatRequest) (<-chan StreamChunk, error) {
+	ch := make(chan StreamChunk, 2)
+	go func() {
+		defer close(ch)
+		resp, err := m.Chat(ctx, req)
+		if err != nil {
+			ch <- StreamChunk{Error: err.Error()}
+			return
+		}
+		ch <- StreamChunk{Text: resp.Text, ToolCalls: resp.ToolCalls}
+		ch <- StreamChunk{Done: true}
+	}()
+	return ch, nil
+}
+
+func (m *Mock) Embed(ctx context.Context, text string) ([]float32, error) {
+	return make([]float32, 1536), nil
+}
+

@@ -25,8 +25,11 @@ func NewModelRouter(cfg config.Config, db *sql.DB, available []providers.Provide
 	return &ModelRouter{cfg: cfg, providers: available, db: db}
 }
 
-func (r *ModelRouter) Select(ctx context.Context, req providers.ChatRequest) (Selection, error) {
-	provider := r.defaultProvider()
+func (r *ModelRouter) Select(ctx context.Context, req providers.ChatRequest, excludeIDs []string) (Selection, error) {
+	provider := r.defaultProvider(excludeIDs)
+	if provider == nil {
+		return Selection{}, fmt.Errorf("no fallback provider available")
+	}
 	model := r.defaultModel(provider)
 	req.Model = model
 	estimate := provider.EstimateCost(req)
@@ -38,3 +41,13 @@ func (r *ModelRouter) Select(ctx context.Context, req providers.ChatRequest) (Se
 	}
 	return Selection{Provider: provider, Model: model, Estimate: estimate}, nil
 }
+
+func (r *ModelRouter) SelectDefaultEmbedder() providers.Provider {
+	for _, p := range r.providers {
+		if p.Type() == providers.TypeOpenAI || p.Type() == providers.TypeOpenAICompatible {
+			return p
+		}
+	}
+	return nil
+}
+

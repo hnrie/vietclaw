@@ -40,18 +40,8 @@ func (s *Service) Chat(ctx context.Context, req ChatRequest) (ChatResponse, erro
 	case router.IntentMemoryQuery:
 		return s.handleMemoryQuery(ctx, req, runID, intent)
 	case router.IntentAction:
-		reply := s.text(i18n.AgentActionBlocked)
-		_ = s.addMessage(ctx, req.SessionID, RoleAssistant, reply)
-		_ = s.finishRun(ctx, runID, RunStatusBlocked, "tool policy blocked", ProviderLocal, ModelRule)
-		return ChatResponse{
-			OK:        true,
-			SessionID: req.SessionID,
-			Intent:    string(intent),
-			Reply:     reply,
-			Provider:  ProviderLocal,
-			Model:     ModelRule,
-		}, nil
+		return s.runAgenticLoop(ctx, req, runID, intent)
 	default:
-		return s.handleProviderChat(ctx, req, runID, intent)
+		return s.runAgenticLoop(ctx, req, runID, intent)
 	}
 }

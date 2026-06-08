@@ -83,6 +83,20 @@ func (p *Anthropic) Chat(ctx context.Context, req ChatRequest) (ChatResponse, er
 		EstimatedCostUSD: EstimateCostUSD(inputTokens, outputTokens, p.cfg),
 	}, nil
 }
+func (p *Anthropic) ChatStream(ctx context.Context, req ChatRequest) (<-chan StreamChunk, error) {
+	ch := make(chan StreamChunk, 2)
+	go func() {
+		defer close(ch)
+		resp, err := p.Chat(ctx, req)
+		if err != nil {
+			ch <- StreamChunk{Error: err.Error()}
+			return
+		}
+		ch <- StreamChunk{Text: resp.Text, ToolCalls: resp.ToolCalls}
+		ch <- StreamChunk{Done: true}
+	}()
+	return ch, nil
+}
 
 func (p *Anthropic) EstimateCost(req ChatRequest) CostEstimate {
 	inTokens := EstimateMessagesTokens(req.Messages)
@@ -92,6 +106,10 @@ func (p *Anthropic) EstimateCost(req ChatRequest) CostEstimate {
 		OutputTokens:     outTokens,
 		EstimatedCostUSD: EstimateCostUSD(inTokens, outTokens, p.cfg),
 	}
+}
+
+func (p *Anthropic) Embed(ctx context.Context, text string) ([]float32, error) {
+	return nil, fmt.Errorf("embeddings not supported by Anthropic provider")
 }
 
 func anthropicRequestFromChat(req ChatRequest, model string) anthropicRequest {

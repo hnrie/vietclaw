@@ -13,7 +13,8 @@ const (
 )
 
 func (s *Service) handleProviderChat(ctx context.Context, req ChatRequest, runID string, intent router.Intent) (ChatResponse, error) {
-	messages, err := s.context.Messages(ctx, req.SessionID, req.UserID, req.Message)
+	embedder := s.router.SelectDefaultEmbedder()
+	messages, err := s.context.Messages(ctx, req.SessionID, req.UserID, req.Message, embedder)
 	if err != nil {
 		_ = s.finishRun(ctx, runID, RunStatusFailed, err.Error(), "", "")
 		return ChatResponse{}, err
@@ -31,7 +32,7 @@ func (s *Service) handleProviderChat(ctx context.Context, req ChatRequest, runID
 			"language": s.Language(),
 		},
 	}
-	selection, err := s.router.Select(ctx, chatReq)
+	selection, err := s.router.Select(ctx, chatReq, nil)
 	if err != nil {
 		reply := err.Error()
 		_ = s.addMessage(ctx, req.SessionID, RoleAssistant, reply)
