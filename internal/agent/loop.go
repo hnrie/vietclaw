@@ -63,7 +63,7 @@ func (s *Service) runAgenticLoop(ctx context.Context, req ChatRequest, runID str
 	var totalCost float64
 	var accumulatedText string
 
-	for step := 1; step <= s.maxAgentSteps(); step++ {
+	for {
 		providerResp, nextSelection, nextExcluded, err := s.chatWithFallback(ctx, chatReq, selection, excludedProviders)
 		if err != nil {
 			_ = s.finishRun(ctx, runID, RunStatusFailed, err.Error(), selection.Provider.ID(), selection.Model)
@@ -105,10 +105,6 @@ func (s *Service) runAgenticLoop(ctx context.Context, req ChatRequest, runID str
 
 		finalReply = accumulatedText
 		break
-	}
-
-	if finalReply == "" {
-		finalReply = s.text(i18n.AgentMaxStepsReached)
 	}
 
 	_ = s.addMessage(ctx, req.SessionID, RoleAssistant, finalReply)
@@ -160,7 +156,7 @@ func (s *Service) StreamAgenticLoop(ctx context.Context, req ChatRequest, runID 
 		var totalCost float64
 		var accumulatedText string
 
-		for step := 1; step <= s.maxAgentSteps(); step++ {
+		for {
 			attempt, nextSelection, nextExcluded, err := s.streamWithFallback(ctx, ch, chatReq, selection, excludedProviders)
 			if err != nil {
 				_ = s.finishRun(ctx, runID, RunStatusFailed, err.Error(), selection.Provider.ID(), selection.Model)
@@ -214,11 +210,6 @@ func (s *Service) StreamAgenticLoop(ctx context.Context, req ChatRequest, runID 
 			break
 		}
 
-		if accumulatedText == "" {
-			accumulatedText = s.text(i18n.AgentMaxStepsReached)
-			ch <- providers.StreamChunk{Event: "text", Text: accumulatedText}
-		}
-
 		_ = s.addMessage(ctx, req.SessionID, RoleAssistant, accumulatedText)
 		_ = s.insertCost(ctx, providers.ChatResponse{
 			Provider:         finalProvider,
@@ -263,13 +254,6 @@ func (s *Service) loopChatRequest(req ChatRequest, messages []providers.Message)
 		},
 		Tools: s.tools.GetDefinitions(),
 	}
-}
-
-func (s *Service) maxAgentSteps() int {
-	if s.cfg.Agent.MaxSteps > 0 {
-		return s.cfg.Agent.MaxSteps
-	}
-	return config.DefaultMaxAgentSteps
 }
 
 func (s *Service) maxOutputTokens() int {

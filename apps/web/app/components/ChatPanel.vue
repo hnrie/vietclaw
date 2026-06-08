@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ArrowUp, RefreshCw, Copy, Terminal, Wrench, CheckCircle2, AlertCircle } from '@lucide/vue'
+import { AlertCircle, ArrowUp, CheckCircle2, Copy, RefreshCw, Terminal, Wrench } from '@lucide/vue'
 import { marked } from 'marked'
 import hljs from 'highlight.js'
 
@@ -13,7 +13,11 @@ const textareaRef = ref<HTMLTextAreaElement | null>(null)
 marked.setOptions({ breaks: true, gfm: true })
 
 function renderMarkdown(text: string): string {
-  try { return marked.parse(text) as string } catch { return text }
+  try {
+    return marked.parse(text) as string
+  } catch {
+    return text
+  }
 }
 
 function autoResize(el: HTMLTextAreaElement) {
@@ -33,7 +37,7 @@ async function handleSend() {
   if (!text || isGenerating.value) return
   chatInput.value = ''
   if (textareaRef.value) textareaRef.value.style.height = 'auto'
-  await sendMessage(text)
+  void sendMessage(text)
   await nextTick()
   scrollToBottom()
 }
@@ -69,126 +73,126 @@ watch(
 </script>
 
 <template>
-  <div class="flex-1 flex flex-col h-full">
-    <!-- Chat Messages -->
+  <div class="flex h-full flex-1 flex-col">
     <div
       ref="chatBox"
       class="flex-1 overflow-y-auto p-4 md:p-6 vc-scrollbar"
       @vue:mounted="(el: any) => { if (el?.$el) highlightCode(el.$el) }"
     >
-      <!-- Empty State -->
       <div
         v-if="messages.length === 0"
-        class="max-w-xl mx-auto h-full flex flex-col justify-center py-20 px-4 text-center"
+        class="mx-auto flex h-full max-w-xl flex-col justify-center px-4 py-20 text-center"
       >
-        <div class="w-10 h-10 rounded border border-zinc-800 bg-zinc-900/40 flex items-center justify-center mx-auto mb-4">
+        <div class="mx-auto mb-4 flex h-10 w-10 items-center justify-center rounded border border-zinc-800 bg-zinc-900/40">
           <Terminal :size="20" class="text-zinc-400" />
         </div>
-        <h3 class="text-sm font-semibold tracking-tight text-zinc-200 mb-1">VietClaw Workspace</h3>
-        <p class="text-zinc-500 text-xs max-w-sm mx-auto mb-6">Lightweight agent workspace. Ask anything or use tools.</p>
+        <h3 class="mb-1 text-sm font-semibold tracking-tight text-zinc-200">VietClaw Workspace</h3>
+        <p class="mx-auto mb-6 max-w-sm text-xs text-zinc-500">Lightweight agent workspace. Ask anything or use tools.</p>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-2 max-w-md mx-auto text-left">
+        <div class="mx-auto grid max-w-md grid-cols-1 gap-2 text-left md:grid-cols-2">
           <button
-            class="p-3 rounded border border-zinc-900 bg-zinc-950/40 hover:border-zinc-700 cursor-pointer transition-all text-left"
-            @click="chatInput = 'Giải thích về kiến trúc microservices'; autoResize($refs.textareaRef as any)"
+            class="cursor-pointer rounded border border-zinc-900 bg-zinc-950/40 p-3 text-left transition-all hover:border-zinc-700"
+            @click="chatInput = 'Giải thích về kiến trúc microservices'; autoResize(textareaRef as HTMLTextAreaElement)"
           >
-            <h4 class="text-xs font-mono text-zinc-300 flex items-center gap-1.5">
+            <h4 class="flex items-center gap-1.5 text-xs font-mono text-zinc-300">
               <Terminal :size="14" class="text-zinc-500" /> microservices
             </h4>
-            <p class="text-[10px] text-zinc-500 mt-1">Giải thích kiến trúc microservices...</p>
+            <p class="mt-1 text-[10px] text-zinc-500">Giải thích kiến trúc microservices...</p>
           </button>
           <button
-            class="p-3 rounded border border-zinc-900 bg-zinc-950/40 hover:border-zinc-700 cursor-pointer transition-all text-left"
-            @click="chatInput = 'Tìm thông tin về Go 1.25 release'; autoResize($refs.textareaRef as any)"
+            class="cursor-pointer rounded border border-zinc-900 bg-zinc-950/40 p-3 text-left transition-all hover:border-zinc-700"
+            @click="chatInput = 'Tìm thông tin về Go release mới nhất'; autoResize(textareaRef as HTMLTextAreaElement)"
           >
-            <h4 class="text-xs font-mono text-zinc-300 flex items-center gap-1.5">
+            <h4 class="flex items-center gap-1.5 text-xs font-mono text-zinc-300">
               <Terminal :size="14" class="text-zinc-500" /> go_release
             </h4>
-            <p class="text-[10px] text-zinc-500 mt-1">Tìm thông tin Go 1.25...</p>
+            <p class="mt-1 text-[10px] text-zinc-500">Tìm thông tin Go mới nhất...</p>
           </button>
           <button
-            class="p-3 rounded border border-zinc-900 bg-zinc-950/40 hover:border-zinc-700 cursor-pointer transition-all text-left"
-            @click="chatInput = 'Đọc file config.json trong workspace'; autoResize($refs.textareaRef as any)"
+            class="cursor-pointer rounded border border-zinc-900 bg-zinc-950/40 p-3 text-left transition-all hover:border-zinc-700"
+            @click="chatInput = 'Đọc file config.json trong workspace'; autoResize(textareaRef as HTMLTextAreaElement)"
           >
-            <h4 class="text-xs font-mono text-zinc-300 flex items-center gap-1.5">
+            <h4 class="flex items-center gap-1.5 text-xs font-mono text-zinc-300">
               <Terminal :size="14" class="text-zinc-500" /> read_file
             </h4>
-            <p class="text-[10px] text-zinc-500 mt-1">Đọc file từ workspace...</p>
+            <p class="mt-1 text-[10px] text-zinc-500">Đọc file từ workspace...</p>
           </button>
           <button
-            class="p-3 rounded border border-zinc-900 bg-zinc-950/40 hover:border-zinc-700 cursor-pointer transition-all text-left"
-            @click="chatInput = 'Tìm file có chứa từ khóa error trong workspace'; autoResize($refs.textareaRef as any)"
+            class="cursor-pointer rounded border border-zinc-900 bg-zinc-950/40 p-3 text-left transition-all hover:border-zinc-700"
+            @click="chatInput = 'Tìm file có chứa từ khóa error trong workspace'; autoResize(textareaRef as HTMLTextAreaElement)"
           >
-            <h4 class="text-xs font-mono text-zinc-300 flex items-center gap-1.5">
+            <h4 class="flex items-center gap-1.5 text-xs font-mono text-zinc-300">
               <Terminal :size="14" class="text-zinc-500" /> grep_files
             </h4>
-            <p class="text-[10px] text-zinc-500 mt-1">Tìm kiếm trong workspace...</p>
+            <p class="mt-1 text-[10px] text-zinc-500">Tìm kiếm trong workspace...</p>
           </button>
         </div>
       </div>
 
-      <!-- Messages -->
-      <div class="space-y-6 max-w-3xl mx-auto">
+      <div class="mx-auto max-w-3xl space-y-6">
         <div
           v-for="(msg, idx) in messages"
           :key="idx"
           class="flex gap-4"
           :class="msg.role === 'user' ? 'justify-end' : 'justify-start'"
         >
-          <!-- AI Avatar -->
           <div
             v-if="msg.role === 'assistant'"
-            class="w-7 h-7 rounded bg-zinc-100 flex items-center justify-center shrink-0 text-zinc-950"
+            class="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-zinc-100 text-zinc-950"
           >
             <span class="text-[9px] font-bold">AI</span>
           </div>
 
-          <!-- User Bubble -->
           <div
             v-if="msg.role === 'user'"
-            class="px-3.5 py-2.5 rounded bg-zinc-900 border border-zinc-800 text-zinc-200 text-sm max-w-[85%] leading-relaxed"
+            class="max-w-[85%] rounded border border-zinc-800 bg-zinc-900 px-3.5 py-2.5 text-sm leading-relaxed text-zinc-200"
           >
             <p class="whitespace-pre-wrap">{{ msg.text }}</p>
           </div>
 
-          <!-- Assistant Bubble -->
-          <div
-            v-else
-            class="max-w-[85%] space-y-2"
-          >
-            <!-- Step-by-step execution -->
+          <div v-else class="max-w-[85%] space-y-2">
             <div v-if="msg.steps.length > 0" class="space-y-1.5">
-              <div
-                v-if="msg.steps.some(step => step.type === 'error')"
-                class="flex items-center gap-2 px-3 py-1.5 rounded bg-rose-950/20 border border-rose-900/20 text-[11px]"
-              >
-                <AlertCircle :size="12" class="text-rose-400 shrink-0" />
-                <span class="text-rose-300">{{ msg.steps.find(step => step.type === 'error')?.error }}</span>
-              </div>
-              <div
-                v-else-if="!msg.text"
-                class="flex items-center gap-2 px-3 py-1.5 rounded bg-zinc-950/40 border border-zinc-900 text-[11px] text-zinc-500"
-              >
-                <Wrench :size="12" class="text-zinc-500 shrink-0" />
-                <span>Đang chạy công cụ...</span>
-              </div>
+              <template v-for="(step, si) in msg.steps" :key="si">
+                <div
+                  v-if="step.type === 'tool_call'"
+                  class="flex items-center gap-2 rounded border border-amber-900/20 bg-amber-950/20 px-3 py-1.5 text-[11px]"
+                >
+                  <Wrench :size="12" class="shrink-0 text-amber-400" />
+                  <span class="font-mono font-medium text-amber-300">Bước {{ si + 1 }}</span>
+                  <span class="text-zinc-400">đang dùng</span>
+                  <span class="font-mono text-zinc-200">{{ step.toolName }}</span>
+                </div>
+                <div
+                  v-else-if="step.type === 'tool_result'"
+                  class="flex items-center gap-2 rounded border border-emerald-900/20 bg-emerald-950/20 px-3 py-1.5 text-[11px]"
+                >
+                  <CheckCircle2 :size="12" class="shrink-0 text-emerald-400" />
+                  <span class="text-emerald-300">xong</span>
+                  <span class="font-mono text-zinc-300">{{ step.toolName }}</span>
+                </div>
+                <div
+                  v-else-if="step.type === 'error'"
+                  class="flex items-center gap-2 rounded border border-rose-900/20 bg-rose-950/20 px-3 py-1.5 text-[11px]"
+                >
+                  <AlertCircle :size="12" class="shrink-0 text-rose-400" />
+                  <span class="text-rose-300">{{ step.error }}</span>
+                </div>
+              </template>
             </div>
 
-            <!-- Assistant text response -->
             <div
               v-if="msg.text"
-              class="px-4 py-3 rounded bg-zinc-950/40 border border-zinc-900 text-sm prose prose-invert"
+              class="rounded border border-zinc-900 bg-zinc-950/40 px-4 py-3 text-sm prose prose-invert"
               v-html="renderMarkdown(msg.text)"
               v-html-hook="highlightCode"
             />
 
-            <!-- Meta line -->
             <div
               v-if="msg.text || msg.steps.length > 0"
               class="flex items-center gap-3.5 pt-1 text-[10px] text-zinc-500"
             >
               <button
-                class="flex items-center gap-1 hover:text-zinc-300 transition-colors"
+                class="flex items-center gap-1 transition-colors hover:text-zinc-300"
                 @click="copyMessage(msg.text)"
               >
                 <Copy :size="12" /> [COPY]
@@ -196,58 +200,54 @@ watch(
             </div>
           </div>
 
-          <!-- User Avatar -->
           <div
             v-if="msg.role === 'user'"
-            class="w-7 h-7 rounded border border-zinc-800 bg-zinc-900 flex items-center justify-center shrink-0"
+            class="flex h-7 w-7 shrink-0 items-center justify-center rounded border border-zinc-800 bg-zinc-900"
           >
             <span class="text-[9px] font-semibold text-zinc-500">USR</span>
           </div>
         </div>
 
-        <!-- Typing Indicator -->
-        <div v-if="isGenerating" class="flex gap-4 justify-start items-center">
-          <div class="w-7 h-7 rounded border border-zinc-800 bg-zinc-950 flex items-center justify-center shrink-0">
+        <div v-if="isGenerating" class="flex items-center justify-start gap-4">
+          <div class="flex h-7 w-7 shrink-0 items-center justify-center rounded border border-zinc-800 bg-zinc-950">
             <span class="text-[9px] text-zinc-500">SYS</span>
           </div>
-          <div class="px-3.5 py-2 rounded bg-zinc-950/20 border border-zinc-900 text-zinc-500 text-xs flex items-center gap-2">
+          <div class="flex items-center gap-2 rounded border border-zinc-900 bg-zinc-950/20 px-3.5 py-2 text-xs text-zinc-500">
             <div class="flex space-x-1">
-              <span class="w-1.5 h-1.5 bg-zinc-500 rounded-full animate-bounce" style="animation-delay: 0.1s" />
-              <span class="w-1.5 h-1.5 bg-zinc-500 rounded-full animate-bounce" style="animation-delay: 0.2s" />
-              <span class="w-1.5 h-1.5 bg-zinc-500 rounded-full animate-bounce" style="animation-delay: 0.3s" />
+              <span class="h-1.5 w-1.5 animate-bounce rounded-full bg-zinc-500" style="animation-delay: 0.1s" />
+              <span class="h-1.5 w-1.5 animate-bounce rounded-full bg-zinc-500" style="animation-delay: 0.2s" />
+              <span class="h-1.5 w-1.5 animate-bounce rounded-full bg-zinc-500" style="animation-delay: 0.3s" />
             </div>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- Input Area -->
-    <div class="p-4 md:p-6 bg-gradient-to-t from-zinc-950/80 to-transparent border-t border-zinc-800/10 z-20">
-      <div class="max-w-3xl mx-auto relative">
-        <div class="rounded-lg border border-zinc-800 bg-zinc-900/30 focus-within:border-zinc-700 transition-colors p-2 flex flex-col">
+    <div class="z-20 border-t border-zinc-800/10 bg-gradient-to-t from-zinc-950/80 to-transparent p-4 md:p-6">
+      <div class="relative mx-auto max-w-3xl">
+        <div class="flex flex-col rounded-lg border border-zinc-800 bg-zinc-900/30 p-2 transition-colors focus-within:border-zinc-700">
           <textarea
             ref="textareaRef"
             v-model="chatInput"
             rows="1"
             placeholder="Type a message..."
-            class="w-full bg-transparent text-zinc-200 placeholder-zinc-600 focus:outline-none resize-none max-h-48 min-h-[32px] px-2 py-1 text-sm leading-relaxed"
+            class="max-h-48 min-h-[32px] w-full resize-none bg-transparent px-2 py-1 text-sm leading-relaxed text-zinc-200 placeholder-zinc-600 focus:outline-none"
             @input="autoResize($event.target as HTMLTextAreaElement)"
             @keydown="onKeydown"
           />
 
-          <div class="flex items-center justify-between pt-2 px-1 border-t border-zinc-800/40 mt-1">
-            <div class="flex items-center gap-1" />
-
+          <div class="mt-1 flex items-center justify-between border-t border-zinc-800/40 px-1 pt-2">
+            <div />
             <div class="flex items-center gap-2">
               <button
-                class="p-1.5 rounded hover:bg-zinc-800 text-zinc-500 hover:text-zinc-300 transition-colors"
+                class="rounded p-1.5 text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-zinc-300"
                 title="Reset Session"
                 @click="clearSessionMessages()"
               >
                 <RefreshCw :size="14" />
               </button>
               <button
-                class="flex items-center justify-center w-7 h-7 rounded bg-zinc-100 hover:bg-zinc-200 text-zinc-950 transition-colors disabled:opacity-30"
+                class="flex h-7 w-7 items-center justify-center rounded bg-zinc-100 text-zinc-950 transition-colors hover:bg-zinc-200 disabled:opacity-30"
                 :disabled="isGenerating || !chatInput.trim()"
                 @click="handleSend"
               >

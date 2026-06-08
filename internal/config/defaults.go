@@ -22,7 +22,7 @@ const (
 	DefaultSkillDir               = ".codex/skills"
 	DefaultMaxContextChars        = 24000
 	DefaultMaxHistoryMessages     = 12
-	DefaultMaxAgentSteps          = 5
+	DefaultMaxAgentSteps          = 0
 	DefaultMaxOutputTokens        = 512
 	DefaultDiscordTokenEnv        = "VIETCLAW_DISCORD_TOKEN"
 	DefaultTelegramTokenEnv       = "VIETCLAW_TELEGRAM_TOKEN"

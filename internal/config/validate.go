@@ -9,8 +9,8 @@ func Validate(cfg Config) error {
 	if cfg.Runtime.MaxConcurrentTasks < 1 {
 		return fmt.Errorf("runtime.max_concurrent_tasks must be >= 1")
 	}
-	if cfg.Agent.MaxSteps < 1 {
-		return fmt.Errorf("agent.max_steps must be >= 1")
+	if cfg.Agent.MaxSteps < 0 {
+		return fmt.Errorf("agent.max_steps must be >= 0")
 	}
 	if cfg.Agent.MaxOutputTokens < 1 {
 		return fmt.Errorf("agent.max_output_tokens must be >= 1")
