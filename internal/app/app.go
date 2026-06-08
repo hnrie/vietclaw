@@ -5,6 +5,7 @@ import (
 	"log"
 	"time"
 
+	"vietclaw/internal/agent"
 	"vietclaw/internal/config"
 	"vietclaw/internal/version"
 )
@@ -17,4 +18,5 @@ type App struct {
 	Version   version.Info
 	DataDir   string
 	LogFile   string
+	Agent     *agent.Service
 }

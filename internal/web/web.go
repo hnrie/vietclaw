@@ -7,8 +7,12 @@ import (
 	"strings"
 	"time"
 
+	"vietclaw/internal/agent"
 	"vietclaw/internal/app"
 	"vietclaw/internal/db"
+	"vietclaw/internal/memory"
+	"vietclaw/internal/providers"
+	"vietclaw/internal/router"
 	webassets "vietclaw/web"
 )
 
@@ -18,6 +22,14 @@ func NewRouter(application *app.App) http.Handler {
 	mux.HandleFunc("GET /health", handleHealth)
 	mux.HandleFunc("GET /status", handleStatus(application))
 	mux.HandleFunc("GET /logs/recent", handleRecentLogs(application))
+	mux.HandleFunc("POST /api/chat", handleAPIChat(application))
+	mux.HandleFunc("GET /api/memory", handleMemoryList(application))
+	mux.HandleFunc("POST /api/memory", handleMemoryAdd(application))
+	mux.HandleFunc("GET /api/memory/search", handleMemorySearch(application))
+	mux.HandleFunc("GET /api/sessions", handleSessions(application))
+	mux.HandleFunc("GET /api/sessions/{id}", handleSessionDetail(application))
+	mux.HandleFunc("GET /api/costs/today", handleCostsToday(application))
+	mux.HandleFunc("GET /api/providers", handleProviders(application))
 	return mux
 }
 
@@ -66,6 +78,109 @@ func handleRecentLogs(application *app.App) http.HandlerFunc {
 			return
 		}
 		writeJSON(w, http.StatusOK, lines)
+	}
+}
+
+func handleAPIChat(application *app.App) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req agent.ChatRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "invalid json"})
+			return
+		}
+		resp, err := application.Agent.Chat(r.Context(), req)
+		if err != nil {
+			resp.OK = false
+			if resp.Error == "" {
+				resp.Error = err.Error()
+			}
+			writeJSON(w, http.StatusBadRequest, resp)
+			return
+		}
+		writeJSON(w, http.StatusOK, resp)
+	}
+}
+
+func handleMemoryList(application *app.App) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		scope := r.URL.Query().Get("scope")
+		records, err := application.Agent.Memory().List(r.Context(), scope, 100)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": err.Error()})
+			return
+		}
+		writeJSON(w, http.StatusOK, records)
+	}
+}
+
+func handleMemoryAdd(application *app.App) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			Scope      string `json:"scope"`
+			Kind       string `json:"kind"`
+			Content    string `json:"content"`
+			Confidence string `json:"confidence"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "invalid json"})
+			return
+		}
+		rec, err := application.Agent.Memory().Add(r.Context(), memory.Record{
+			Scope:      req.Scope,
+			Kind:       memory.Kind(req.Kind),
+			Content:    req.Content,
+			Confidence: memory.Confidence(req.Confidence),
+		})
+		if err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": err.Error()})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "memory": rec})
+	}
+}
+
+func handleMemorySearch(application *app.App) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		records, err := application.Agent.Memory().Search(r.Context(), r.URL.Query().Get("scope"), r.URL.Query().Get("q"), 50)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": err.Error()})
+			return
+		}
+		writeJSON(w, http.StatusOK, records)
+	}
+}
+
+func handleSessions(application *app.App) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		sessions, err := application.Agent.Sessions(r.Context())
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": err.Error()})
+			return
+		}
+		writeJSON(w, http.StatusOK, sessions)
+	}
+}
+
+func handleSessionDetail(application *app.App) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		detail, err := application.Agent.SessionMessages(r.Context(), r.PathValue("id"))
+		if err != nil {
+			writeJSON(w, http.StatusNotFound, map[string]any{"ok": false, "error": "session not found"})
+			return
+		}
+		writeJSON(w, http.StatusOK, detail)
+	}
+}
+
+func handleCostsToday(application *app.App) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, http.StatusOK, map[string]any{"total_cost_usd": router.TodayCost(r.Context(), application.DB)})
+	}
+}
+
+func handleProviders(application *app.App) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, http.StatusOK, providers.Redact(application.Config.Providers))
 	}
 }
 
