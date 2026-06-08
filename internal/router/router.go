@@ -110,15 +110,22 @@ func (r *ModelRouter) SelectDefaultEmbedder() providers.Provider {
 }
 
 func classifyWithProvider(ctx context.Context, provider providers.Provider, model, message, language string) (Intent, error) {
+	systemPrompt := "You are an intent classifier for VietClaw. Classify the user message into exactly one of these intents:\n" +
+		"- memory_add: when the user explicitly requests you to remember, save, or note down facts/information for future reference.\n" +
+		"- memory_query: when the user asks you to recall, search, or check what you remember, what you saved, or past user notes (e.g. \"mày nhớ gì\", \"nhớ gì\"). DO NOT select this for general web search, current news, or real-time info.\n" +
+		"- action: when the user wants to execute commands, read/write files, or run scripts.\n" +
+		"- chat: for general questions, greetings, requests to search the web/news (e.g., weather, oil prices), or normal conversation.\n" +
+		"- unknown: when the message is empty or unclear.\n\n" +
+		"Return compact JSON only: {\"intent\":\"...\"}. Language hint: " + language
+
 	resp, err := provider.Chat(ctx, providers.ChatRequest{
 		Model:           model,
-		MaxOutputTokens: 32,
+		MaxOutputTokens: 64,
 		Temperature:     0,
 		Messages: []providers.Message{
 			{
-				Role: "system",
-				Content: "Classify the user message into exactly one intent: memory_add, memory_query, action, chat, unknown. " +
-					"Return compact JSON only: {\"intent\":\"...\"}. Language hint: " + language,
+				Role:    "system",
+				Content: systemPrompt,
 			},
 			{Role: "user", Content: message},
 		},
@@ -178,20 +185,22 @@ func selectAgentWithProvider(ctx context.Context, provider providers.Provider, m
 }
 
 func parseAgentSelection(text string) string {
+	cleaned := cleanJSON(text)
 	var payload struct {
 		AgentID string `json:"agent_id"`
 	}
-	if err := json.Unmarshal([]byte(strings.TrimSpace(text)), &payload); err == nil {
+	if err := json.Unmarshal([]byte(cleaned), &payload); err == nil {
 		return strings.TrimSpace(payload.AgentID)
 	}
 	return ""
 }
 
 func parseIntentResponse(text string) Intent {
+	cleaned := cleanJSON(text)
 	var payload struct {
 		Intent string `json:"intent"`
 	}
-	if err := json.Unmarshal([]byte(strings.TrimSpace(text)), &payload); err == nil {
+	if err := json.Unmarshal([]byte(cleaned), &payload); err == nil {
 		return ParseIntent(payload.Intent)
 	}
 	for _, intent := range []Intent{IntentMemoryAdd, IntentMemoryQuery, IntentAction, IntentChat, IntentUnknown} {
@@ -200,4 +209,24 @@ func parseIntentResponse(text string) Intent {
 		}
 	}
 	return IntentUnknown
+}
+
+func cleanJSON(text string) string {
+	text = strings.TrimSpace(text)
+	if strings.HasPrefix(text, "```") {
+		lines := strings.Split(text, "\n")
+		if len(lines) > 2 {
+			if strings.HasPrefix(lines[0], "```") {
+				lines = lines[1:]
+			}
+			if strings.HasSuffix(lines[len(lines)-1], "```") || lines[len(lines)-1] == "```" {
+				lines = lines[:len(lines)-1]
+			}
+			text = strings.Join(lines, "\n")
+		}
+	}
+	text = strings.TrimPrefix(text, "```json")
+	text = strings.TrimPrefix(text, "```")
+	text = strings.TrimSuffix(text, "```")
+	return strings.TrimSpace(text)
 }
