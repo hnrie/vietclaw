@@ -13,6 +13,3 @@ apps/web/.nuxt/
 apps/web/.output/
 apps/web/dist/
 scratch/
-dist/
-internal/web/dist/nuxt/
-internal/web/dist/
