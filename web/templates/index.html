@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>VietClaw</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: #101114;
+        color: #f4f4f5;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+      }
+      main {
+        width: min(680px, calc(100vw - 40px));
+      }
+      h1 {
+        margin: 0 0 12px;
+        font-size: clamp(40px, 8vw, 84px);
+        line-height: 0.95;
+      }
+      p {
+        margin: 0 0 18px;
+        color: #d4d4d8;
+        font-size: 18px;
+      }
+      dl {
+        display: grid;
+        grid-template-columns: max-content 1fr;
+        gap: 10px 16px;
+        margin: 24px 0;
+      }
+      dt {
+        color: #a1a1aa;
+      }
+      dd {
+        margin: 0;
+      }
+      a {
+        color: #7dd3fc;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>VietClaw</h1>
+      <p>lightweight personal agent runtime</p>
+      <dl>
+        <dt>daemon</dt>
+        <dd>running</dd>
+        <dt>version</dt>
+        <dd>{{ .Version }}</dd>
+        <dt>uptime</dt>
+        <dd>{{ .Uptime }}</dd>
+      </dl>
+      <a href="/status">Open status JSON</a>
+    </main>
+  </body>
+</html>
+

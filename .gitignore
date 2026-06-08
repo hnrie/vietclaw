@@ -1,0 +1,10 @@
+.vietclaw/
+vietclaw
+vietclaw.exe
+*.log
+*.db
+*.db-shm
+*.db-wal
+dist/
+tmp/
+
