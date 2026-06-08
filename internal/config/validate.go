@@ -18,6 +18,15 @@ func Validate(cfg Config) error {
 	if cfg.Budget.DailyUSDLimit < 0 || cfg.Budget.RequireApprovalAboveUSD < 0 {
 		return fmt.Errorf("budget values must be >= 0")
 	}
+	if cfg.Tools.Shell.Sandbox != "" && cfg.Tools.Shell.Sandbox != "none" && cfg.Tools.Shell.Sandbox != "docker" {
+		return fmt.Errorf("tools.shell.sandbox must be none or docker")
+	}
+	if cfg.Tools.Shell.WorkspaceMode != "" && cfg.Tools.Shell.WorkspaceMode != "ro" && cfg.Tools.Shell.WorkspaceMode != "rw" {
+		return fmt.Errorf("tools.shell.workspace_mode must be ro or rw")
+	}
+	if cfg.Tools.Shell.TimeoutSeconds < 0 {
+		return fmt.Errorf("tools.shell.timeout_seconds must be >= 0")
+	}
 	for _, provider := range cfg.Providers {
 		if provider.ID == "" {
 			return fmt.Errorf("provider id is required")

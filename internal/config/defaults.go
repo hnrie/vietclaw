@@ -35,6 +35,11 @@ const (
 	DefaultEmbedModel    = "text-embedding-3-small"
 	DefaultIntentMode    = "hybrid"
 	DefaultAgentRouting  = "hybrid"
+	DefaultShellSandbox  = "none"
+	DefaultDockerBinary  = "docker"
+	DefaultDockerImage   = "alpine:3.20"
+	DefaultDockerNetwork = "none"
+	DefaultWorkspaceMode = "ro"
 
 	DefaultDailyUSDLimit           = 0.25
 	DefaultRequireApprovalAboveUSD = 0.05
@@ -100,7 +105,14 @@ func Default(paths Paths) Config {
 			AllowEscalation: true,
 		},
 		Tools: ToolsConfig{
-			Shell: ShellToolConfig{Enabled: false},
+			Shell: ShellToolConfig{
+				Enabled:       false,
+				Sandbox:       DefaultShellSandbox,
+				DockerBinary:  DefaultDockerBinary,
+				DockerImage:   DefaultDockerImage,
+				DockerNetwork: DefaultDockerNetwork,
+				WorkspaceMode: DefaultWorkspaceMode,
+			},
 			Files: FileToolConfig{
 				Enabled:       true,
 				WorkspaceOnly: true,

@@ -44,6 +44,9 @@ func TestDefaultIncludesAgentRuntime(t *testing.T) {
 	if cfg.Tools.Shell.Enabled {
 		t.Fatal("shell must be disabled by default")
 	}
+	if cfg.Tools.Shell.Sandbox != config.DefaultShellSandbox || cfg.Tools.Shell.DockerImage != config.DefaultDockerImage {
+		t.Fatalf("shell sandbox default invalid: %#v", cfg.Tools.Shell)
+	}
 	if !cfg.Tools.Files.Enabled || !cfg.Tools.Files.WorkspaceOnly {
 		t.Fatalf("file tools default invalid: %#v", cfg.Tools.Files)
 	}

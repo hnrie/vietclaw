@@ -120,7 +120,13 @@ type MCPServerConfig struct {
 }
 
 type ShellToolConfig struct {
-	Enabled bool `json:"enabled"`
+	Enabled        bool   `json:"enabled"`
+	Sandbox        string `json:"sandbox,omitempty"`
+	DockerBinary   string `json:"docker_binary,omitempty"`
+	DockerImage    string `json:"docker_image,omitempty"`
+	DockerNetwork  string `json:"docker_network,omitempty"`
+	WorkspaceMode  string `json:"workspace_mode,omitempty"`
+	TimeoutSeconds int    `json:"timeout_seconds,omitempty"`
 }
 
 type FileToolConfig struct {

@@ -136,6 +136,7 @@ func mergeRouter(cfg RouterConfig, def RouterConfig) RouterConfig {
 }
 
 func mergeTools(cfg ToolsConfig, def ToolsConfig) ToolsConfig {
+	cfg.Shell = mergeShell(cfg.Shell, def.Shell)
 	if !cfg.Files.Enabled {
 		cfg.Files.Enabled = def.Files.Enabled
 	}
@@ -144,6 +145,28 @@ func mergeTools(cfg ToolsConfig, def ToolsConfig) ToolsConfig {
 	}
 	if cfg.MCP == nil {
 		cfg.MCP = def.MCP
+	}
+	return cfg
+}
+
+func mergeShell(cfg ShellToolConfig, def ShellToolConfig) ShellToolConfig {
+	if cfg.Sandbox == "" {
+		cfg.Sandbox = def.Sandbox
+	}
+	if cfg.DockerBinary == "" {
+		cfg.DockerBinary = def.DockerBinary
+	}
+	if cfg.DockerImage == "" {
+		cfg.DockerImage = def.DockerImage
+	}
+	if cfg.DockerNetwork == "" {
+		cfg.DockerNetwork = def.DockerNetwork
+	}
+	if cfg.WorkspaceMode == "" {
+		cfg.WorkspaceMode = def.WorkspaceMode
+	}
+	if cfg.TimeoutSeconds == 0 {
+		cfg.TimeoutSeconds = def.TimeoutSeconds
 	}
 	return cfg
 }
