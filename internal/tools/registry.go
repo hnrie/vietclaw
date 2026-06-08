@@ -6,7 +6,14 @@ import (
 	"fmt"
 
 	"vietclaw/internal/config"
+	"vietclaw/internal/i18n"
 	"vietclaw/internal/providers"
+)
+
+const (
+	toolFileRead  = "file_read"
+	toolFileWrite = "file_write"
+	toolShellExec = "shell_exec"
 )
 
 type ToolRegistry struct {
@@ -22,29 +29,21 @@ func NewRegistry(cfg config.Config) *ToolRegistry {
 		cfg:    cfg,
 		tools:  make(map[string]Tool),
 	}
-	r.tools["file_read"] = FileRead{Policy: p}
-	r.tools["file_write"] = FileWrite{Policy: p}
-	r.tools["shell_exec"] = ShellExec{Policy: p}
+	r.tools[toolFileRead] = FileRead{Policy: p}
+	r.tools[toolFileWrite] = FileWrite{Policy: p}
+	r.tools[toolShellExec] = ShellExec{Policy: p}
 	return r
 }
 
 func (r *ToolRegistry) Execute(ctx context.Context, name string, argsJSON string) (string, error) {
-	normalized := name
-	if name == "file.read" {
-		normalized = "file_read"
-	} else if name == "file.write" {
-		normalized = "file_write"
-	} else if name == "shell.exec" {
-		normalized = "shell_exec"
-	}
-
+	normalized := normalizeToolName(name)
 	t, ok := r.tools[normalized]
 	if !ok {
 		return "", fmt.Errorf("tool not found: %s", name)
 	}
 
 	switch normalized {
-	case "file_read":
+	case toolFileRead:
 		var args struct {
 			Path string `json:"path"`
 		}
@@ -52,8 +51,7 @@ func (r *ToolRegistry) Execute(ctx context.Context, name string, argsJSON string
 			return t.Run(ctx, argsJSON)
 		}
 		return t.Run(ctx, args.Path)
-
-	case "file_write":
+	case toolFileWrite:
 		var args struct {
 			Path    string `json:"path"`
 			Content string `json:"content"`
@@ -62,8 +60,7 @@ func (r *ToolRegistry) Execute(ctx context.Context, name string, argsJSON string
 			return "", err
 		}
 		return t.Run(ctx, args.Path+"\n"+args.Content)
-
-	case "shell_exec":
+	case toolShellExec:
 		var args struct {
 			Command string `json:"command"`
 		}
@@ -71,7 +68,6 @@ func (r *ToolRegistry) Execute(ctx context.Context, name string, argsJSON string
 			return t.Run(ctx, argsJSON)
 		}
 		return t.Run(ctx, args.Command)
-
 	default:
 		return t.Run(ctx, argsJSON)
 	}
@@ -79,19 +75,20 @@ func (r *ToolRegistry) Execute(ctx context.Context, name string, argsJSON string
 
 func (r *ToolRegistry) GetDefinitions() []providers.ToolDefinition {
 	var list []providers.ToolDefinition
+	lang := r.cfg.Agent.Language
 
 	if r.cfg.Tools.Files.Enabled {
 		list = append(list, providers.ToolDefinition{
 			Type: "function",
 			Function: providers.FunctionDetail{
-				Name:        "file_read",
-				Description: "Đọc nội dung của một tệp tin trong workspace. Trả về toàn bộ nội dung.",
+				Name:        toolFileRead,
+				Description: i18n.T(lang, i18n.ToolFileRead),
 				Parameters: map[string]any{
 					"type": "object",
 					"properties": map[string]any{
 						"path": map[string]any{
 							"type":        "string",
-							"description": "Đường dẫn tuyệt đối hoặc tương đối của tệp tin.",
+							"description": i18n.T(lang, i18n.ToolPathParam),
 						},
 					},
 					"required": []string{"path"},
@@ -102,18 +99,18 @@ func (r *ToolRegistry) GetDefinitions() []providers.ToolDefinition {
 		list = append(list, providers.ToolDefinition{
 			Type: "function",
 			Function: providers.FunctionDetail{
-				Name:        "file_write",
-				Description: "Ghi nội dung mới vào một tệp tin trong workspace. Tự động tạo các thư mục cha nếu chưa có.",
+				Name:        toolFileWrite,
+				Description: i18n.T(lang, i18n.ToolFileWrite),
 				Parameters: map[string]any{
 					"type": "object",
 					"properties": map[string]any{
 						"path": map[string]any{
 							"type":        "string",
-							"description": "Đường dẫn tuyệt đối hoặc tương đối của tệp tin.",
+							"description": i18n.T(lang, i18n.ToolPathParam),
 						},
 						"content": map[string]any{
 							"type":        "string",
-							"description": "Nội dung cần ghi vào file.",
+							"description": i18n.T(lang, i18n.ToolContentParam),
 						},
 					},
 					"required": []string{"path", "content"},
@@ -126,14 +123,14 @@ func (r *ToolRegistry) GetDefinitions() []providers.ToolDefinition {
 		list = append(list, providers.ToolDefinition{
 			Type: "function",
 			Function: providers.FunctionDetail{
-				Name:        "shell_exec",
-				Description: "Thực thi lệnh shell hệ thống và trả về kết quả output kết hợp (stdout + stderr).",
+				Name:        toolShellExec,
+				Description: i18n.T(lang, i18n.ToolShellExec),
 				Parameters: map[string]any{
 					"type": "object",
 					"properties": map[string]any{
 						"command": map[string]any{
 							"type":        "string",
-							"description": "Lệnh command cần thực thi.",
+							"description": i18n.T(lang, i18n.ToolCommandParam),
 						},
 					},
 					"required": []string{"command"},
@@ -143,4 +140,17 @@ func (r *ToolRegistry) GetDefinitions() []providers.ToolDefinition {
 	}
 
 	return list
+}
+
+func normalizeToolName(name string) string {
+	switch name {
+	case "file.read":
+		return toolFileRead
+	case "file.write":
+		return toolFileWrite
+	case "shell.exec":
+		return toolShellExec
+	default:
+		return name
+	}
 }

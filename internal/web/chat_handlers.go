@@ -49,14 +49,14 @@ func handleAPIChatStream(application *app.App) http.HandlerFunc {
 
 		ch, err := application.Agent.ChatStream(r.Context(), req)
 		if err != nil {
-			fmt.Fprintf(w, "event: error\ndata: %s\n\n", err.Error())
+			writeSSEJSON(w, "error", map[string]string{"error": err.Error()})
 			flusher.Flush()
 			return
 		}
 
 		for chunk := range ch {
 			if chunk.Error != "" {
-				fmt.Fprintf(w, "event: error\ndata: %s\n\n", chunk.Error)
+				writeSSEJSON(w, "error", map[string]string{"error": chunk.Error})
 				flusher.Flush()
 				return
 			}
@@ -66,10 +66,17 @@ func handleAPIChatStream(application *app.App) http.HandlerFunc {
 				break
 			}
 			if chunk.Text != "" {
-				payload, _ := json.Marshal(map[string]string{"text": chunk.Text})
-				fmt.Fprintf(w, "data: %s\n\n", string(payload))
+				writeSSEJSON(w, "", map[string]string{"text": chunk.Text})
 				flusher.Flush()
 			}
 		}
 	}
+}
+
+func writeSSEJSON(w http.ResponseWriter, event string, value any) {
+	payload, _ := json.Marshal(value)
+	if event != "" {
+		fmt.Fprintf(w, "event: %s\n", event)
+	}
+	fmt.Fprintf(w, "data: %s\n\n", string(payload))
 }

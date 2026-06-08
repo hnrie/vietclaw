@@ -17,6 +17,9 @@ func TestDefaultIncludesAgentRuntime(t *testing.T) {
 	if cfg.Agent.Language != config.DefaultAgentLanguage {
 		t.Fatalf("agent language = %q", cfg.Agent.Language)
 	}
+	if cfg.Agent.MaxSteps != config.DefaultMaxAgentSteps || cfg.Agent.MaxOutputTokens != config.DefaultMaxOutputTokens {
+		t.Fatalf("agent loop defaults invalid: %#v", cfg.Agent)
+	}
 	if cfg.Agent.Workspace != filepath.Join(dir, "workspace") {
 		t.Fatalf("workspace = %q", cfg.Agent.Workspace)
 	}

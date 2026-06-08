@@ -20,6 +20,8 @@ const (
 	DefaultAgentStyle             = "natural_short"
 	DefaultMaxContextChars        = 24000
 	DefaultMaxHistoryMessages     = 12
+	DefaultMaxAgentSteps          = 5
+	DefaultMaxOutputTokens        = 512
 	DefaultDiscordTokenEnv        = "VIETCLAW_DISCORD_TOKEN"
 	DefaultTelegramTokenEnv       = "VIETCLAW_TELEGRAM_TOKEN"
 	DefaultRespondMentionOrReply  = "mention_or_reply"
@@ -28,6 +30,7 @@ const (
 	DefaultProviderID    = "mock"
 	DefaultProviderType  = "mock"
 	DefaultProviderModel = "mock-small"
+	DefaultEmbedModel    = "text-embedding-3-small"
 
 	DefaultDailyUSDLimit           = 0.25
 	DefaultRequireApprovalAboveUSD = 0.05
@@ -54,6 +57,8 @@ func Default(paths Paths) Config {
 			Workspace:          filepath.Join(paths.DataDir, WorkspaceName),
 			MaxContextChars:    DefaultMaxContextChars,
 			MaxHistoryMessages: DefaultMaxHistoryMessages,
+			MaxSteps:           DefaultMaxAgentSteps,
+			MaxOutputTokens:    DefaultMaxOutputTokens,
 		},
 		Channels: ChannelsConfig{
 			Discord: DiscordConfig{

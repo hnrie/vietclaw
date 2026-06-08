@@ -41,6 +41,8 @@ type AgentConfig struct {
 	Workspace          string `json:"workspace"`
 	MaxContextChars    int    `json:"max_context_chars"`
 	MaxHistoryMessages int    `json:"max_history_messages"`
+	MaxSteps           int    `json:"max_steps"`
+	MaxOutputTokens    int    `json:"max_output_tokens"`
 }
 
 type ChannelsConfig struct {
@@ -74,6 +76,7 @@ type ProviderConfig struct {
 	BaseURL      string  `json:"base_url,omitempty"`
 	APIKeyEnv    string  `json:"api_key_env,omitempty"`
 	Command      string  `json:"command,omitempty"`
+	EmbedModel   string  `json:"embed_model,omitempty"`
 	CostPer1KIn  float64 `json:"cost_per_1k_input,omitempty"`
 	CostPer1KOut float64 `json:"cost_per_1k_output,omitempty"`
 }

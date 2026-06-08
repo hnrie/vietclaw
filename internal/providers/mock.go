@@ -62,4 +62,3 @@ func (m *Mock) ChatStream(ctx context.Context, req ChatRequest) (<-chan StreamCh
 func (m *Mock) Embed(ctx context.Context, text string) ([]float32, error) {
 	return make([]float32, 1536), nil
 }
-

@@ -264,7 +264,7 @@ func (p *OpenAICompatible) Embed(ctx context.Context, text string) ([]float32, e
 	}
 
 	body := map[string]any{
-		"model": "text-embedding-3-small",
+		"model": defaultString(p.cfg.EmbedModel, config.DefaultEmbedModel),
 		"input": text,
 	}
 

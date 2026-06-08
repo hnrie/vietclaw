@@ -54,6 +54,12 @@ func mergeAgent(cfg AgentConfig, def AgentConfig) AgentConfig {
 	if cfg.MaxHistoryMessages == 0 {
 		cfg.MaxHistoryMessages = def.MaxHistoryMessages
 	}
+	if cfg.MaxSteps == 0 {
+		cfg.MaxSteps = def.MaxSteps
+	}
+	if cfg.MaxOutputTokens == 0 {
+		cfg.MaxOutputTokens = def.MaxOutputTokens
+	}
 	return cfg
 }
 

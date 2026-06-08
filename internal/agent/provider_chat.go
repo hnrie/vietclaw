@@ -8,8 +8,7 @@ import (
 )
 
 const (
-	defaultTemperature     = 0.2
-	defaultMaxOutputTokens = 512
+	defaultTemperature = 0.2
 )
 
 func (s *Service) handleProviderChat(ctx context.Context, req ChatRequest, runID string, intent router.Intent) (ChatResponse, error) {
@@ -24,7 +23,7 @@ func (s *Service) handleProviderChat(ctx context.Context, req ChatRequest, runID
 		SessionID:       req.SessionID,
 		Messages:        messages,
 		Temperature:     defaultTemperature,
-		MaxOutputTokens: defaultMaxOutputTokens,
+		MaxOutputTokens: s.maxOutputTokens(),
 		Metadata: map[string]any{
 			"user_id":  req.UserID,
 			"channel":  req.Channel,

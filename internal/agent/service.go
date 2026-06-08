@@ -49,4 +49,3 @@ func (s *Service) text(id i18n.MessageID, args ...any) string {
 func (s *Service) Router() *router.ModelRouter {
 	return s.router
 }
-

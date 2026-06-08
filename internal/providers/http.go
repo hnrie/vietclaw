@@ -77,4 +77,3 @@ func (p *CustomHTTP) ChatStream(ctx context.Context, req ChatRequest) (<-chan St
 func (p *CustomHTTP) Embed(ctx context.Context, text string) ([]float32, error) {
 	return nil, fmt.Errorf("embeddings not supported by CustomHTTP provider")
 }
-

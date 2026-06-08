@@ -90,6 +90,21 @@ func TestAPIRouteNotSwallowedByStaticFallback(t *testing.T) {
 	}
 }
 
+func TestAPIChatStreamErrorIsJSONEvent(t *testing.T) {
+	application := testApp(t)
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/chat/stream", bytes.NewBufferString(`{"message":""}`))
+	web.NewRouter(application).ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d body = %s", rec.Code, rec.Body.String())
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, "event: error") || !strings.Contains(body, `"error"`) {
+		t.Fatalf("expected json error SSE event, got %q", body)
+	}
+}
+
 func testApp(t *testing.T) *app.App {
 	t.Helper()
 	database, err := db.Open(filepath.Join(t.TempDir(), "test.db"))

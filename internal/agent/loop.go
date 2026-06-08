@@ -5,16 +5,16 @@ import (
 	"fmt"
 	"strings"
 
+	"vietclaw/internal/config"
+	"vietclaw/internal/i18n"
 	"vietclaw/internal/providers"
 	"vietclaw/internal/router"
 )
 
-const maxAgenticSteps = 5
-
 func (s *Service) ChatStream(ctx context.Context, req ChatRequest) (<-chan providers.StreamChunk, error) {
 	req = normalizeRequest(req, s.cfg)
 	if strings.TrimSpace(req.Message) == "" {
-		return nil, fmt.Errorf("message is empty")
+		return nil, fmt.Errorf("%s", s.text(i18n.AgentMessageRequired))
 	}
 
 	if err := s.ensureSession(ctx, req); err != nil {
@@ -32,38 +32,13 @@ func (s *Service) ChatStream(ctx context.Context, req ChatRequest) (<-chan provi
 
 	switch intent {
 	case router.IntentMemoryAdd:
-		ch := make(chan providers.StreamChunk, 2)
-		go func() {
-			defer close(ch)
-			resp, err := s.handleMemoryAdd(ctx, req, runID, intent)
-			if err != nil {
-				ch <- providers.StreamChunk{Error: err.Error()}
-				return
-			}
-			ch <- providers.StreamChunk{Text: resp.Reply}
-			ch <- providers.StreamChunk{Done: true}
-		}()
-		return ch, nil
-
+		return s.streamRuleResponse(ctx, req, runID, intent, s.handleMemoryAdd)
 	case router.IntentMemoryQuery:
-		ch := make(chan providers.StreamChunk, 2)
-		go func() {
-			defer close(ch)
-			resp, err := s.handleMemoryQuery(ctx, req, runID, intent)
-			if err != nil {
-				ch <- providers.StreamChunk{Error: err.Error()}
-				return
-			}
-			ch <- providers.StreamChunk{Text: resp.Reply}
-			ch <- providers.StreamChunk{Done: true}
-		}()
-		return ch, nil
-
+		return s.streamRuleResponse(ctx, req, runID, intent, s.handleMemoryQuery)
 	default:
 		return s.StreamAgenticLoop(ctx, req, runID, intent)
 	}
 }
-
 
 func (s *Service) runAgenticLoop(ctx context.Context, req ChatRequest, runID string, intent router.Intent) (ChatResponse, error) {
 	embedder := s.router.SelectDefaultEmbedder()
@@ -73,39 +48,10 @@ func (s *Service) runAgenticLoop(ctx context.Context, req ChatRequest, runID str
 		return ChatResponse{}, err
 	}
 
-	chatReq := providers.ChatRequest{
-		SessionID:       req.SessionID,
-		Messages:        messages,
-		Temperature:     defaultTemperature,
-		MaxOutputTokens: defaultMaxOutputTokens,
-		Metadata: map[string]any{
-			"user_id":  req.UserID,
-			"channel":  req.Channel,
-			"mode":     req.Mode,
-			"language": s.Language(),
-		},
-		Tools: s.tools.GetDefinitions(),
-	}
-
-	var excludedProviders []string
-	var selection router.Selection
-
-	for {
-		sel, err := s.router.Select(ctx, chatReq, excludedProviders)
-		if err != nil {
-			reply := err.Error()
-			_ = s.addMessage(ctx, req.SessionID, RoleAssistant, reply)
-			_ = s.finishRun(ctx, runID, RunStatusNeedsApproval, reply, "", "")
-			return ChatResponse{
-				OK:        false,
-				SessionID: req.SessionID,
-				Intent:    string(intent),
-				Reply:     reply,
-				Error:     reply,
-			}, nil
-		}
-		selection = sel
-		break
+	chatReq := s.loopChatRequest(req, messages)
+	selection, excludedProviders, err := s.selectLoopProvider(ctx, chatReq, nil)
+	if err != nil {
+		return s.selectionError(ctx, req, runID, intent, err), nil
 	}
 	chatReq.Model = selection.Model
 
@@ -114,69 +60,39 @@ func (s *Service) runAgenticLoop(ctx context.Context, req ChatRequest, runID str
 	var finalModel string
 	var totalCost float64
 
-	for step := 1; step <= maxAgenticSteps; step++ {
-		var providerResp providers.ChatResponse
-		var err error
-
-		for {
-			providerResp, err = selection.Provider.Chat(ctx, chatReq)
-			if err != nil {
-				// Provider failed, exclude it and fallback
-				excludedProviders = append(excludedProviders, selection.Provider.ID())
-				sel, fallbackErr := s.router.Select(ctx, chatReq, excludedProviders)
-				if fallbackErr != nil {
-					_ = s.finishRun(ctx, runID, RunStatusFailed, err.Error(), selection.Provider.ID(), selection.Model)
-					return ChatResponse{
-						OK:        false,
-						SessionID: req.SessionID,
-						Intent:    string(intent),
-						Provider:  selection.Provider.ID(),
-						Model:     selection.Model,
-						Error:     err.Error(),
-					}, err
-				}
-				selection = sel
-				chatReq.Model = selection.Model
-				continue
-			}
-			break
+	for step := 1; step <= s.maxAgentSteps(); step++ {
+		providerResp, nextSelection, nextExcluded, err := s.chatWithFallback(ctx, chatReq, selection, excludedProviders)
+		if err != nil {
+			_ = s.finishRun(ctx, runID, RunStatusFailed, err.Error(), selection.Provider.ID(), selection.Model)
+			return ChatResponse{
+				OK:        false,
+				SessionID: req.SessionID,
+				Intent:    string(intent),
+				Provider:  selection.Provider.ID(),
+				Model:     selection.Model,
+				Error:     err.Error(),
+			}, err
 		}
+		selection = nextSelection
+		excludedProviders = nextExcluded
+		chatReq.Model = selection.Model
 
 		totalCost += providerResp.EstimatedCostUSD
 		finalProvider = providerResp.Provider
 		finalModel = providerResp.Model
 
 		if len(providerResp.ToolCalls) > 0 {
-			assistantMsg := providers.Message{
+			chatReq.Messages = append(chatReq.Messages, providers.Message{
 				Role:      RoleAssistant,
 				Content:   providerResp.Text,
 				ToolCalls: providerResp.ToolCalls,
-			}
-			chatReq.Messages = append(chatReq.Messages, assistantMsg)
+			})
 			if err := s.addMessage(ctx, req.SessionID, RoleAssistant, providerResp.Text); err != nil {
 				return ChatResponse{}, err
 			}
-
-			for _, tc := range providerResp.ToolCalls {
-				toolResult, err := s.tools.Execute(ctx, tc.Function.Name, tc.Function.Arguments)
-				if err != nil {
-					toolResult = fmt.Sprintf("Error executing tool: %s", err.Error())
-				}
-
-				toolMsg := providers.Message{
-					Role:       "tool",
-					Name:       tc.Function.Name,
-					ToolCallID: tc.ID,
-					Content:    toolResult,
-				}
-				chatReq.Messages = append(chatReq.Messages, toolMsg)
-
-				toolPersistText := fmt.Sprintf("[Tool Execution: %s]\nInput: %s\nOutput: %s", tc.Function.Name, tc.Function.Arguments, toolResult)
-				if err := s.addMessage(ctx, req.SessionID, "system", toolPersistText); err != nil {
-					return ChatResponse{}, err
-				}
+			if err := s.executeToolCalls(ctx, req.SessionID, providerResp.ToolCalls, &chatReq); err != nil {
+				return ChatResponse{}, err
 			}
-
 			continue
 		}
 
@@ -185,17 +101,15 @@ func (s *Service) runAgenticLoop(ctx context.Context, req ChatRequest, runID str
 	}
 
 	if finalReply == "" {
-		finalReply = "Đã đạt số bước thực thi tối đa nhưng chưa có phản hồi cuối cùng."
+		finalReply = s.text(i18n.AgentMaxStepsReached)
 	}
 
 	_ = s.addMessage(ctx, req.SessionID, RoleAssistant, finalReply)
-
-	accumulatedResp := providers.ChatResponse{
+	_ = s.insertCost(ctx, providers.ChatResponse{
 		Provider:         finalProvider,
 		Model:            finalModel,
 		EstimatedCostUSD: totalCost,
-	}
-	_ = s.insertCost(ctx, accumulatedResp)
+	})
 	_ = s.finishRun(ctx, runID, RunStatusCompleted, finalReply, finalProvider, finalModel)
 
 	return ChatResponse{
@@ -223,34 +137,12 @@ func (s *Service) StreamAgenticLoop(ctx context.Context, req ChatRequest, runID 
 			return
 		}
 
-		chatReq := providers.ChatRequest{
-			SessionID:       req.SessionID,
-			Messages:        messages,
-			Temperature:     defaultTemperature,
-			MaxOutputTokens: defaultMaxOutputTokens,
-			Metadata: map[string]any{
-				"user_id":  req.UserID,
-				"channel":  req.Channel,
-				"mode":     req.Mode,
-				"language": s.Language(),
-			},
-			Tools: s.tools.GetDefinitions(),
-		}
-
-		var excludedProviders []string
-		var selection router.Selection
-
-		for {
-			sel, err := s.router.Select(ctx, chatReq, excludedProviders)
-			if err != nil {
-				reply := err.Error()
-				_ = s.addMessage(ctx, req.SessionID, RoleAssistant, reply)
-				_ = s.finishRun(ctx, runID, RunStatusNeedsApproval, reply, "", "")
-				ch <- providers.StreamChunk{Error: reply}
-				return
-			}
-			selection = sel
-			break
+		chatReq := s.loopChatRequest(req, messages)
+		selection, excludedProviders, err := s.selectLoopProvider(ctx, chatReq, nil)
+		if err != nil {
+			resp := s.selectionError(ctx, req, runID, intent, err)
+			ch <- providers.StreamChunk{Error: resp.Error}
+			return
 		}
 		chatReq.Model = selection.Model
 
@@ -259,115 +151,222 @@ func (s *Service) StreamAgenticLoop(ctx context.Context, req ChatRequest, runID 
 		var totalCost float64
 		var currentAssistantMessage string
 
-		for step := 1; step <= maxAgenticSteps; step++ {
-			var streamCh <-chan providers.StreamChunk
-			var err error
-
-			for {
-				streamCh, err = selection.Provider.ChatStream(ctx, chatReq)
-				if err != nil {
-					excludedProviders = append(excludedProviders, selection.Provider.ID())
-					sel, fallbackErr := s.router.Select(ctx, chatReq, excludedProviders)
-					if fallbackErr != nil {
-						_ = s.finishRun(ctx, runID, RunStatusFailed, err.Error(), selection.Provider.ID(), selection.Model)
-						ch <- providers.StreamChunk{Error: err.Error()}
-						return
-					}
-					selection = sel
-					chatReq.Model = selection.Model
-					continue
-				}
-				break
+		for step := 1; step <= s.maxAgentSteps(); step++ {
+			attempt, nextSelection, nextExcluded, err := s.streamWithFallback(ctx, ch, chatReq, selection, excludedProviders)
+			if err != nil {
+				_ = s.finishRun(ctx, runID, RunStatusFailed, err.Error(), selection.Provider.ID(), selection.Model)
+				ch <- providers.StreamChunk{Error: err.Error()}
+				return
 			}
+			selection = nextSelection
+			excludedProviders = nextExcluded
+			chatReq.Model = selection.Model
 
 			finalProvider = selection.Provider.ID()
 			finalModel = selection.Model
-			currentAssistantMessage = ""
+			currentAssistantMessage = attempt.text
 
-			var stepToolCalls []providers.ToolCall
-
-			for chunk := range streamCh {
-				if chunk.Error != "" {
-					ch <- providers.StreamChunk{Error: chunk.Error}
-					return
-				}
-				if chunk.Text != "" {
-					currentAssistantMessage += chunk.Text
-					ch <- providers.StreamChunk{Text: chunk.Text}
-				}
-				if len(chunk.ToolCalls) > 0 {
-					stepToolCalls = append(stepToolCalls, chunk.ToolCalls...)
-				}
-			}
-
-			// Estimate token cost
-			outTokens := providers.EstimateTokens(currentAssistantMessage)
 			tempReq := chatReq
-			tempReq.MaxOutputTokens = outTokens
+			tempReq.MaxOutputTokens = providers.EstimateTokens(currentAssistantMessage)
 			totalCost += selection.Provider.EstimateCost(tempReq).EstimatedCostUSD
 
-			if len(stepToolCalls) > 0 {
-				assistantMsg := providers.Message{
+			if len(attempt.toolCalls) > 0 {
+				chatReq.Messages = append(chatReq.Messages, providers.Message{
 					Role:      RoleAssistant,
 					Content:   currentAssistantMessage,
-					ToolCalls: stepToolCalls,
-				}
-				chatReq.Messages = append(chatReq.Messages, assistantMsg)
+					ToolCalls: attempt.toolCalls,
+				})
 				if err := s.addMessage(ctx, req.SessionID, RoleAssistant, currentAssistantMessage); err != nil {
 					ch <- providers.StreamChunk{Error: err.Error()}
 					return
 				}
 
-				// Execute tool calls
-				for _, tc := range stepToolCalls {
-					statusMsg := fmt.Sprintf("\n*[Chạy công cụ: %s...]*\n", tc.Function.Name)
-					ch <- providers.StreamChunk{Text: statusMsg}
-
-					toolResult, err := s.tools.Execute(ctx, tc.Function.Name, tc.Function.Arguments)
+				for _, tc := range attempt.toolCalls {
+					ch <- providers.StreamChunk{Text: s.text(i18n.AgentToolStatus, tc.Function.Name)}
+					toolResult, err := s.executeToolCall(ctx, req.SessionID, tc, &chatReq)
 					if err != nil {
-						toolResult = fmt.Sprintf("Lỗi thực thi công cụ: %s", err.Error())
-					}
-
-					toolMsg := providers.Message{
-						Role:       "tool",
-						Name:       tc.Function.Name,
-						ToolCallID: tc.ID,
-						Content:    toolResult,
-					}
-					chatReq.Messages = append(chatReq.Messages, toolMsg)
-
-					toolPersistText := fmt.Sprintf("[Tool Execution: %s]\nInput: %s\nOutput: %s", tc.Function.Name, tc.Function.Arguments, toolResult)
-					if err := s.addMessage(ctx, req.SessionID, "system", toolPersistText); err != nil {
 						ch <- providers.StreamChunk{Error: err.Error()}
 						return
 					}
-
-					ch <- providers.StreamChunk{Text: fmt.Sprintf("\n*[Kết quả: %s]*\n", toolResult)}
+					ch <- providers.StreamChunk{Text: s.text(i18n.AgentToolResult, toolResult)}
 				}
-
 				continue
 			}
-
 			break
 		}
 
 		if currentAssistantMessage == "" {
-			currentAssistantMessage = "Đã đạt số bước thực thi tối đa nhưng chưa có phản hồi cuối cùng."
+			currentAssistantMessage = s.text(i18n.AgentMaxStepsReached)
 			ch <- providers.StreamChunk{Text: currentAssistantMessage}
 		}
 
 		_ = s.addMessage(ctx, req.SessionID, RoleAssistant, currentAssistantMessage)
-
-		accumulatedResp := providers.ChatResponse{
+		_ = s.insertCost(ctx, providers.ChatResponse{
 			Provider:         finalProvider,
 			Model:            finalModel,
 			EstimatedCostUSD: totalCost,
-		}
-		_ = s.insertCost(ctx, accumulatedResp)
+		})
 		_ = s.finishRun(ctx, runID, RunStatusCompleted, currentAssistantMessage, finalProvider, finalModel)
-
 		ch <- providers.StreamChunk{Done: true}
 	}()
 
 	return ch, nil
+}
+
+type ruleHandler func(context.Context, ChatRequest, string, router.Intent) (ChatResponse, error)
+
+func (s *Service) streamRuleResponse(ctx context.Context, req ChatRequest, runID string, intent router.Intent, handle ruleHandler) (<-chan providers.StreamChunk, error) {
+	ch := make(chan providers.StreamChunk, 2)
+	go func() {
+		defer close(ch)
+		resp, err := handle(ctx, req, runID, intent)
+		if err != nil {
+			ch <- providers.StreamChunk{Error: err.Error()}
+			return
+		}
+		ch <- providers.StreamChunk{Text: resp.Reply}
+		ch <- providers.StreamChunk{Done: true}
+	}()
+	return ch, nil
+}
+
+func (s *Service) loopChatRequest(req ChatRequest, messages []providers.Message) providers.ChatRequest {
+	return providers.ChatRequest{
+		SessionID:       req.SessionID,
+		Messages:        messages,
+		Temperature:     defaultTemperature,
+		MaxOutputTokens: s.maxOutputTokens(),
+		Metadata: map[string]any{
+			"user_id":  req.UserID,
+			"channel":  req.Channel,
+			"mode":     req.Mode,
+			"language": s.Language(),
+		},
+		Tools: s.tools.GetDefinitions(),
+	}
+}
+
+func (s *Service) maxAgentSteps() int {
+	if s.cfg.Agent.MaxSteps > 0 {
+		return s.cfg.Agent.MaxSteps
+	}
+	return config.DefaultMaxAgentSteps
+}
+
+func (s *Service) maxOutputTokens() int {
+	if s.cfg.Agent.MaxOutputTokens > 0 {
+		return s.cfg.Agent.MaxOutputTokens
+	}
+	return config.DefaultMaxOutputTokens
+}
+
+func (s *Service) selectLoopProvider(ctx context.Context, req providers.ChatRequest, excluded []string) (router.Selection, []string, error) {
+	selection, err := s.router.Select(ctx, req, excluded)
+	return selection, excluded, err
+}
+
+func (s *Service) selectionError(ctx context.Context, req ChatRequest, runID string, intent router.Intent, err error) ChatResponse {
+	reply := err.Error()
+	_ = s.addMessage(ctx, req.SessionID, RoleAssistant, reply)
+	_ = s.finishRun(ctx, runID, RunStatusNeedsApproval, reply, "", "")
+	return ChatResponse{
+		OK:        false,
+		SessionID: req.SessionID,
+		Intent:    string(intent),
+		Reply:     reply,
+		Error:     reply,
+	}
+}
+
+func (s *Service) chatWithFallback(ctx context.Context, req providers.ChatRequest, selection router.Selection, excluded []string) (providers.ChatResponse, router.Selection, []string, error) {
+	for {
+		resp, err := selection.Provider.Chat(ctx, req)
+		if err == nil {
+			return resp, selection, excluded, nil
+		}
+		excluded = append(excluded, selection.Provider.ID())
+		next, fallbackErr := s.router.Select(ctx, req, excluded)
+		if fallbackErr != nil {
+			return providers.ChatResponse{}, selection, excluded, err
+		}
+		selection = next
+		req.Model = selection.Model
+	}
+}
+
+type streamAttempt struct {
+	text      string
+	toolCalls []providers.ToolCall
+}
+
+func (s *Service) streamWithFallback(ctx context.Context, out chan<- providers.StreamChunk, req providers.ChatRequest, selection router.Selection, excluded []string) (streamAttempt, router.Selection, []string, error) {
+	for {
+		streamCh, err := selection.Provider.ChatStream(ctx, req)
+		if err != nil {
+			excluded = append(excluded, selection.Provider.ID())
+			next, fallbackErr := s.router.Select(ctx, req, excluded)
+			if fallbackErr != nil {
+				return streamAttempt{}, selection, excluded, err
+			}
+			selection = next
+			req.Model = selection.Model
+			continue
+		}
+
+		var attempt streamAttempt
+		failed := ""
+		for chunk := range streamCh {
+			if chunk.Error != "" {
+				failed = chunk.Error
+				break
+			}
+			if chunk.Text != "" {
+				attempt.text += chunk.Text
+				out <- providers.StreamChunk{Text: chunk.Text}
+			}
+			if len(chunk.ToolCalls) > 0 {
+				attempt.toolCalls = append(attempt.toolCalls, chunk.ToolCalls...)
+			}
+		}
+		if failed == "" {
+			return attempt, selection, excluded, nil
+		}
+
+		excluded = append(excluded, selection.Provider.ID())
+		next, fallbackErr := s.router.Select(ctx, req, excluded)
+		if fallbackErr != nil {
+			return streamAttempt{}, selection, excluded, fmt.Errorf("%s", failed)
+		}
+		selection = next
+		req.Model = selection.Model
+	}
+}
+
+func (s *Service) executeToolCalls(ctx context.Context, sessionID string, calls []providers.ToolCall, req *providers.ChatRequest) error {
+	for _, tc := range calls {
+		if _, err := s.executeToolCall(ctx, sessionID, tc, req); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *Service) executeToolCall(ctx context.Context, sessionID string, tc providers.ToolCall, req *providers.ChatRequest) (string, error) {
+	toolResult, err := s.tools.Execute(ctx, tc.Function.Name, tc.Function.Arguments)
+	if err != nil {
+		toolResult = s.text(i18n.AgentToolExecuteError, err.Error())
+	}
+
+	req.Messages = append(req.Messages, providers.Message{
+		Role:       "tool",
+		Name:       tc.Function.Name,
+		ToolCallID: tc.ID,
+		Content:    toolResult,
+	})
+
+	toolPersistText := fmt.Sprintf("[Tool Execution: %s]\nInput: %s\nOutput: %s", tc.Function.Name, tc.Function.Arguments, toolResult)
+	if err := s.addMessage(ctx, sessionID, "system", toolPersistText); err != nil {
+		return "", err
+	}
+	return toolResult, nil
 }

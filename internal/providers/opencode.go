@@ -69,4 +69,3 @@ func (p *OpenCodeCLI) ChatStream(ctx context.Context, req ChatRequest) (<-chan S
 func (p *OpenCodeCLI) Embed(ctx context.Context, text string) ([]float32, error) {
 	return nil, fmt.Errorf("embeddings not supported by OpenCodeCLI provider")
 }
-

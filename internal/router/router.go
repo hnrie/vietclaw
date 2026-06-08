@@ -50,4 +50,3 @@ func (r *ModelRouter) SelectDefaultEmbedder() providers.Provider {
 	}
 	return nil
 }
-

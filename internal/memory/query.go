@@ -9,52 +9,65 @@ import (
 	"vietclaw/internal/providers"
 )
 
-// SearchHybrid searches memories using both FTS/Keyword query and Vector Cosine Similarity
 func (s *Store) SearchHybrid(ctx context.Context, scope, query string, limit int, embedder providers.Provider) ([]Record, error) {
 	if limit <= 0 {
 		limit = 10
 	}
 
-	// 1. Get initial candidates from database
-	candidates, err := s.Search(ctx, scope, query, limit*3)
+	keywordCandidates, err := s.Search(ctx, scope, query, limit*3)
 	if err != nil {
 		return nil, err
 	}
 
-	// If no embedder or candidates, return standard list
-	if embedder == nil || len(candidates) == 0 {
-		if len(candidates) > limit {
-			return candidates[:limit], nil
+	if embedder == nil || strings.TrimSpace(query) == "" {
+		if len(keywordCandidates) > limit {
+			return keywordCandidates[:limit], nil
 		}
-		return candidates, nil
+		return keywordCandidates, nil
 	}
 
-	// 2. Generate embedding for query
 	queryEmb, err := embedder.Embed(ctx, query)
 	if err != nil {
-		// Fallback to text search if embedding fails
-		if len(candidates) > limit {
-			return candidates[:limit], nil
+		if len(keywordCandidates) > limit {
+			return keywordCandidates[:limit], nil
 		}
-		return candidates, nil
+		return keywordCandidates, nil
 	}
 
-	// 3. Compute cosine similarity score and rank candidates
+	vectorCandidates, err := s.searchVectorCandidates(ctx, scope, queryEmb, limit*6)
+	if err != nil {
+		vectorCandidates = nil
+	}
+
 	type scoredRecord struct {
 		record Record
 		score  float32
 	}
-	var scoredList []scoredRecord
 
-	for _, rec := range candidates {
-		var similarity float32
+	scored := map[int64]scoredRecord{}
+	for idx, rec := range keywordCandidates {
+		score := float32(1.0)
 		if len(rec.Embedding) > 0 {
-			similarity = CosineSimilarity(queryEmb, rec.Embedding)
-		} else {
-			// fallback slight score if no embedding stored yet
-			similarity = 0.1
+			score += CosineSimilarity(queryEmb, rec.Embedding)
 		}
-		scoredList = append(scoredList, scoredRecord{record: rec, score: similarity})
+		score += float32(len(keywordCandidates)-idx) * 0.001
+		scored[rec.ID] = scoredRecord{record: rec, score: score}
+	}
+	for _, rec := range vectorCandidates {
+		score := CosineSimilarity(queryEmb, rec.Embedding)
+		if existing, ok := scored[rec.ID]; ok {
+			if score > existing.score {
+				existing.score = score
+			}
+			scored[rec.ID] = existing
+			continue
+		}
+		scored[rec.ID] = scoredRecord{record: rec, score: score}
+	}
+
+	scoredList := make([]scoredRecord, 0, len(scored))
+	for _, item := range scored {
+		scoredList = append(scoredList, item)
 	}
 
 	sort.Slice(scoredList, func(i, j int) bool {
@@ -67,6 +80,42 @@ func (s *Store) SearchHybrid(ctx context.Context, scope, query string, limit int
 	}
 
 	return result, nil
+}
+
+func (s *Store) searchVectorCandidates(ctx context.Context, scope string, queryEmb []float32, limit int) ([]Record, error) {
+	if len(queryEmb) == 0 {
+		return nil, nil
+	}
+	if limit <= 0 {
+		limit = 50
+	}
+
+	args := []any{}
+	sqlQuery := `
+SELECT id, scope, kind, content, confidence, created_at, updated_at, embedding
+FROM memories
+WHERE embedding IS NOT NULL`
+	if scope != "" {
+		sqlQuery += ` AND scope = ?`
+		args = append(args, scope)
+	}
+	sqlQuery += ` ORDER BY id DESC LIMIT ?`
+	args = append(args, limit)
+
+	rows, err := s.db.QueryContext(ctx, sqlQuery, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	records, err := scanRecords(rows)
+	if err != nil {
+		return nil, err
+	}
+	sort.Slice(records, func(i, j int) bool {
+		return CosineSimilarity(queryEmb, records[i].Embedding) > CosineSimilarity(queryEmb, records[j].Embedding)
+	})
+	return records, nil
 }
 
 func (s *Store) List(ctx context.Context, scope string, limit int) ([]Record, error) {
@@ -150,4 +199,3 @@ WHERE lower(content) LIKE ?`
 	defer rows.Close()
 	return scanRecords(rows)
 }
-
