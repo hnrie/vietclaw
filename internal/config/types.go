@@ -97,6 +97,7 @@ type RouterConfig struct {
 	DefaultProvider string `json:"default_provider"`
 	DefaultModel    string `json:"default_model"`
 	IntentMode      string `json:"intent_mode"`
+	AgentRouting    string `json:"agent_routing"`
 	CheapFirst      bool   `json:"cheap_first"`
 	AllowEscalation bool   `json:"allow_escalation"`
 }

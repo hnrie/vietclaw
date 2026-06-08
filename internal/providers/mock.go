@@ -20,6 +20,14 @@ func NewMock(cfg config.ProviderConfig) *Mock {
 func (m *Mock) Chat(_ context.Context, req ChatRequest) (ChatResponse, error) {
 	lang := metadataLanguage(req.Metadata)
 	text := i18n.T(lang, i18n.ProviderMockDefault)
+	if len(req.Messages) >= 2 && strings.Contains(req.Messages[0].Content, "Choose one VietClaw agent") {
+		last := strings.ToLower(req.Messages[len(req.Messages)-1].Content)
+		if strings.Contains(last, "research") || strings.Contains(last, "nghiên cứu") || strings.Contains(last, "nghien cuu") {
+			text = `{"agent_id":"researcher","reason":"research task"}`
+		} else {
+			text = `{"agent_id":"default","reason":"general task"}`
+		}
+	}
 	if len(req.Messages) > 0 {
 		last := strings.ToLower(req.Messages[len(req.Messages)-1].Content)
 		if strings.Contains(last, "memory") || strings.Contains(last, "nhớ") {

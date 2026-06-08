@@ -59,6 +59,22 @@ func TestDelegateMentionSelectsAgentProfile(t *testing.T) {
 	}
 }
 
+func TestLLMDelegateSelectsAgentProfile(t *testing.T) {
+	service, cleanup := testService(t)
+	defer cleanup()
+
+	resp, err := service.Chat(context.Background(), agent.ChatRequest{
+		UserID:  "local",
+		Message: "please research storage options for this project",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.AgentID != "researcher" {
+		t.Fatalf("llm delegated agent id = %q", resp.AgentID)
+	}
+}
+
 func testService(t *testing.T) (*agent.Service, func()) {
 	t.Helper()
 	database, err := db.Open(filepath.Join(t.TempDir(), "test.db"))

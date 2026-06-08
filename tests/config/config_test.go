@@ -35,6 +35,9 @@ func TestDefaultIncludesAgentRuntime(t *testing.T) {
 	if cfg.Router.IntentMode != config.DefaultIntentMode {
 		t.Fatalf("router intent mode = %q", cfg.Router.IntentMode)
 	}
+	if cfg.Router.AgentRouting != config.DefaultAgentRouting {
+		t.Fatalf("router agent routing = %q", cfg.Router.AgentRouting)
+	}
 	if len(cfg.Agents) != 1 || cfg.Agents[0].ID != config.DefaultAgentID {
 		t.Fatalf("default agents invalid: %#v", cfg.Agents)
 	}

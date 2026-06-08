@@ -34,6 +34,7 @@ const (
 	DefaultProviderModel = "mock-small"
 	DefaultEmbedModel    = "text-embedding-3-small"
 	DefaultIntentMode    = "hybrid"
+	DefaultAgentRouting  = "hybrid"
 
 	DefaultDailyUSDLimit           = 0.25
 	DefaultRequireApprovalAboveUSD = 0.05
@@ -94,6 +95,7 @@ func Default(paths Paths) Config {
 			DefaultProvider: DefaultProviderID,
 			DefaultModel:    DefaultProviderModel,
 			IntentMode:      DefaultIntentMode,
+			AgentRouting:    DefaultAgentRouting,
 			CheapFirst:      true,
 			AllowEscalation: true,
 		},

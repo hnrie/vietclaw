@@ -13,7 +13,7 @@ import (
 
 func (s *Service) ChatStream(ctx context.Context, req ChatRequest) (<-chan providers.StreamChunk, error) {
 	req = normalizeRequest(req, s.cfg)
-	req = s.applyAgentProfile(req)
+	req = s.applyAgentProfile(ctx, req)
 	if strings.TrimSpace(req.Message) == "" {
 		return nil, fmt.Errorf("%s", s.text(i18n.AgentMessageRequired))
 	}

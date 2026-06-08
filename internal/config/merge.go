@@ -123,6 +123,9 @@ func mergeRouter(cfg RouterConfig, def RouterConfig) RouterConfig {
 	if cfg.IntentMode == "" {
 		cfg.IntentMode = def.IntentMode
 	}
+	if cfg.AgentRouting == "" {
+		cfg.AgentRouting = def.AgentRouting
+	}
 	if !cfg.CheapFirst {
 		cfg.CheapFirst = def.CheapFirst
 	}

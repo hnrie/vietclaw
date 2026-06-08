@@ -68,6 +68,38 @@ func (r *ModelRouter) Select(ctx context.Context, req providers.ChatRequest, exc
 	return Selection{Provider: provider, Model: model, Estimate: estimate}, nil
 }
 
+func (r *ModelRouter) SelectAgent(ctx context.Context, message, language string, profiles []config.AgentProfileConfig) string {
+	rule := selectAgentByRule(message, profiles)
+	mode := strings.ToLower(strings.TrimSpace(r.cfg.Router.AgentRouting))
+	if mode == "" {
+		mode = config.DefaultAgentRouting
+	}
+	if mode == "rule" || rule != "" {
+		return rule
+	}
+	if mode != "llm" && mode != "hybrid" {
+		return ""
+	}
+
+	provider := r.defaultProvider(nil)
+	if provider == nil {
+		return ""
+	}
+	agentID, err := selectAgentWithProvider(ctx, provider, r.defaultModel(provider), message, language, profiles)
+	if err != nil {
+		return ""
+	}
+	if agentID == config.DefaultAgentID {
+		return ""
+	}
+	for _, profile := range profiles {
+		if profile.ID == agentID {
+			return agentID
+		}
+	}
+	return ""
+}
+
 func (r *ModelRouter) SelectDefaultEmbedder() providers.Provider {
 	for _, p := range r.providers {
 		if p.Type() == providers.TypeOpenAI || p.Type() == providers.TypeOpenAICompatible {
@@ -95,6 +127,64 @@ func classifyWithProvider(ctx context.Context, provider providers.Provider, mode
 		return IntentUnknown, err
 	}
 	return parseIntentResponse(resp.Text), nil
+}
+
+func selectAgentByRule(message string, profiles []config.AgentProfileConfig) string {
+	text := strings.ToLower(message)
+	for _, profile := range profiles {
+		if profile.ID == "" || profile.ID == config.DefaultAgentID {
+			continue
+		}
+		id := strings.ToLower(profile.ID)
+		if strings.Contains(text, "@"+id) || strings.Contains(text, "delegate to "+id) {
+			return profile.ID
+		}
+	}
+	return ""
+}
+
+func selectAgentWithProvider(ctx context.Context, provider providers.Provider, model, message, language string, profiles []config.AgentProfileConfig) (string, error) {
+	var agents []map[string]string
+	for _, profile := range profiles {
+		if profile.ID == "" {
+			continue
+		}
+		agents = append(agents, map[string]string{
+			"id":          profile.ID,
+			"name":        profile.Name,
+			"description": profile.Persona,
+		})
+	}
+	encodedAgents, _ := json.Marshal(agents)
+	resp, err := provider.Chat(ctx, providers.ChatRequest{
+		Model:           model,
+		MaxOutputTokens: 64,
+		Temperature:     0,
+		Messages: []providers.Message{
+			{
+				Role: "system",
+				Content: "Choose one VietClaw agent for the task. Return compact JSON only: " +
+					"{\"agent_id\":\"default|one_of_the_ids\",\"reason\":\"short\"}. " +
+					"Choose default when no specialized agent clearly fits. Language hint: " + language +
+					"\nAgents: " + string(encodedAgents),
+			},
+			{Role: "user", Content: message},
+		},
+	})
+	if err != nil {
+		return "", err
+	}
+	return parseAgentSelection(resp.Text), nil
+}
+
+func parseAgentSelection(text string) string {
+	var payload struct {
+		AgentID string `json:"agent_id"`
+	}
+	if err := json.Unmarshal([]byte(strings.TrimSpace(text)), &payload); err == nil {
+		return strings.TrimSpace(payload.AgentID)
+	}
+	return ""
 }
 
 func parseIntentResponse(text string) Intent {

@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"context"
 	"strings"
 
 	"vietclaw/internal/config"
@@ -36,21 +37,11 @@ func (s *Service) memoryScope(req ChatRequest) string {
 }
 
 func (s *Service) selectDelegateAgent(message string) string {
-	text := strings.ToLower(message)
-	for _, profile := range s.cfg.Agents {
-		if profile.ID == "" || profile.ID == config.DefaultAgentID {
-			continue
-		}
-		id := strings.ToLower(profile.ID)
-		if strings.Contains(text, "@"+id) || strings.Contains(text, "delegate to "+id) {
-			return profile.ID
-		}
-	}
-	return ""
+	return s.router.SelectAgent(context.Background(), message, s.Language(), s.cfg.Agents)
 }
 
-func (s *Service) applyAgentProfile(req ChatRequest) ChatRequest {
-	if delegate := s.selectDelegateAgent(req.Message); delegate != "" {
+func (s *Service) applyAgentProfile(ctx context.Context, req ChatRequest) ChatRequest {
+	if delegate := s.router.SelectAgent(ctx, req.Message, s.Language(), s.cfg.Agents); delegate != "" {
 		req.AgentID = delegate
 	}
 	return req
