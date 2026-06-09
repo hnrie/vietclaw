@@ -123,8 +123,9 @@ func Default(paths Paths) Config {
 				WorkspaceMode:  DefaultWorkspaceMode,
 				TimeoutSeconds: DefaultShellTimeout,
 				NetworkPolicy: ShellNetworkPolicyConfig{
-					Enabled:     true,
-					DenyPrivate: true,
+					Enabled:              true,
+					RestrictToAllowHosts: false,
+					DenyPrivate:          true,
 					DenyHosts: []string{
 						"localhost",
 						"metadata.google.internal",

@@ -99,3 +99,37 @@ func TestUpdateChannelEnabledKeepsExistingConfig(t *testing.T) {
 		t.Fatal("discord was not disabled")
 	}
 }
+
+func TestShellNetworkPolicyHostLists(t *testing.T) {
+	cfg := config.Default(config.Paths{DataDir: t.TempDir()})
+	var err error
+	cfg, err = config.AddShellNetworkHost(cfg, config.NetworkPolicyAllow, "https://Example.COM/path")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg, err = config.AddShellNetworkHost(cfg, config.NetworkPolicyAllow, "example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := cfg.Tools.Shell.NetworkPolicy.AllowHosts; len(got) != 1 || got[0] != "example.com" {
+		t.Fatalf("allow hosts = %#v", got)
+	}
+	cfg, err = config.AddShellNetworkHost(cfg, config.NetworkPolicyDeny, "*.internal")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := cfg.Tools.Shell.NetworkPolicy.DenyHosts; len(got) == 0 || got[len(got)-1] != "*.internal" {
+		t.Fatalf("deny hosts = %#v", got)
+	}
+	cfg, err = config.RemoveShellNetworkHost(cfg, config.NetworkPolicyAllow, "example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cfg.Tools.Shell.NetworkPolicy.AllowHosts) != 0 {
+		t.Fatalf("allow host was not removed: %#v", cfg.Tools.Shell.NetworkPolicy.AllowHosts)
+	}
+	cfg = config.SetShellNetworkPolicyRestrictToAllow(cfg, true)
+	if !cfg.Tools.Shell.NetworkPolicy.RestrictToAllowHosts {
+		t.Fatal("restrict to allow was not enabled")
+	}
+}

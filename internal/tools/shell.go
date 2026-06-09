@@ -146,11 +146,6 @@ func (p Policy) hostAllowed(host string) error {
 		return nil
 	}
 	policy := p.cfg.Tools.Shell.NetworkPolicy
-	for _, pattern := range policy.AllowHosts {
-		if hostMatches(host, pattern) {
-			return nil
-		}
-	}
 	for _, pattern := range policy.DenyHosts {
 		if hostMatches(host, pattern) {
 			return fmt.Errorf("blocked shell network host: %s", host)
@@ -168,6 +163,9 @@ func (p Policy) hostAllowed(host string) error {
 				}
 			}
 		}
+	}
+	if policy.RestrictToAllowHosts && !hostInPatterns(host, policy.AllowHosts) {
+		return fmt.Errorf("blocked shell network host: %s is not in allow list", host)
 	}
 	return nil
 }
@@ -189,6 +187,15 @@ func hostMatches(host string, pattern string) bool {
 		return strings.HasSuffix(host, suffix)
 	}
 	return host == pattern
+}
+
+func hostInPatterns(host string, patterns []string) bool {
+	for _, pattern := range patterns {
+		if hostMatches(host, pattern) {
+			return true
+		}
+	}
+	return false
 }
 
 func privateIP(ip net.IP) bool {

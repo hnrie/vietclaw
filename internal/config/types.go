@@ -141,10 +141,11 @@ type ShellToolConfig struct {
 }
 
 type ShellNetworkPolicyConfig struct {
-	Enabled     bool     `json:"enabled"`
-	AllowHosts  []string `json:"allow_hosts,omitempty"`
-	DenyHosts   []string `json:"deny_hosts,omitempty"`
-	DenyPrivate bool     `json:"deny_private"`
+	Enabled              bool     `json:"enabled"`
+	RestrictToAllowHosts bool     `json:"restrict_to_allow_hosts"`
+	AllowHosts           []string `json:"allow_hosts,omitempty"`
+	DenyHosts            []string `json:"deny_hosts,omitempty"`
+	DenyPrivate          bool     `json:"deny_private"`
 }
 
 type FileToolConfig struct {

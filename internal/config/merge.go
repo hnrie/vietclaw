@@ -193,6 +193,9 @@ func mergeShellNetworkPolicy(cfg ShellNetworkPolicyConfig, def ShellNetworkPolic
 	if !cfg.Enabled {
 		cfg.Enabled = def.Enabled
 	}
+	if !cfg.RestrictToAllowHosts {
+		cfg.RestrictToAllowHosts = def.RestrictToAllowHosts
+	}
 	if cfg.AllowHosts == nil {
 		cfg.AllowHosts = def.AllowHosts
 	}
