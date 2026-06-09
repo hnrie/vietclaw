@@ -71,7 +71,7 @@ func (a *Adapter) handleMessage(ctx context.Context, bot *tgbotapi.BotAPI, msg *
 	}
 	isPrivate := msg.Chat.IsPrivate()
 	botUsername := "@" + bot.Self.UserName
-	mentionsBot := strings.Contains(strings.ToLower(text), strings.ToLower(botUsername))
+	mentionsBot := telegramMentionsBot(msg, bot.Self.ID, botUsername, text)
 	isReplyToBot := msg.ReplyToMessage != nil && msg.ReplyToMessage.From != nil && msg.ReplyToMessage.From.ID == bot.Self.ID
 
 	inbound := channels.InboundMessage{
@@ -91,14 +91,50 @@ func (a *Adapter) handleMessage(ctx context.Context, bot *tgbotapi.BotAPI, msg *
 	}
 
 	if !channels.ShouldHandle(inbound, channels.TelegramPolicy(a.cfg)) {
+		if a.handler != nil && a.handler.Log != nil {
+			a.handler.Log.Printf("telegram ignored message chat=%s dm=%t mention=%t reply_to_bot=%t text_len=%d attachments=%d", chatID, isPrivate, mentionsBot, isReplyToBot, len([]rune(text)), len(attachments))
+		}
 		return
 	}
-	typing := tgbotapi.NewChatAction(msg.Chat.ID, tgbotapi.ChatTyping)
-	_, _ = bot.Send(typing)
+	stopTyping := startTyping(ctx, bot, msg.Chat.ID)
+	defer stopTyping()
 
 	_ = a.handler.Handle(ctx, inbound, channels.TelegramPolicy(a.cfg), []string{botUsername}, func(sendCtx context.Context, replyTo channels.InboundMessage, reply string) error {
 		return sendChunks(sendCtx, bot, msg, reply, a.handler.Text(i18n.ChannelEmptyPrompt))
 	})
+}
+
+func telegramMentionsBot(msg *tgbotapi.Message, botID int64, botUsername string, text string) bool {
+	if strings.Contains(strings.ToLower(text), strings.ToLower(botUsername)) {
+		return true
+	}
+	for _, entity := range append(msg.Entities, msg.CaptionEntities...) {
+		if entity.Type == "text_mention" && entity.User != nil && entity.User.ID == botID {
+			return true
+		}
+	}
+	return false
+}
+
+func startTyping(ctx context.Context, bot *tgbotapi.BotAPI, chatID int64) func() {
+	typingCtx, cancel := context.WithCancel(ctx)
+	sendTyping := func() {
+		_, _ = bot.Send(tgbotapi.NewChatAction(chatID, tgbotapi.ChatTyping))
+	}
+	sendTyping()
+	go func() {
+		ticker := time.NewTicker(4 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-typingCtx.Done():
+				return
+			case <-ticker.C:
+				sendTyping()
+			}
+		}
+	}()
+	return cancel
 }
 
 func (a *Adapter) attachments(ctx context.Context, bot *tgbotapi.BotAPI, msg *tgbotapi.Message) []channels.Attachment {

@@ -21,6 +21,12 @@ func TestShouldHandle(t *testing.T) {
 	if channels.ShouldHandle(channels.InboundMessage{IsGroup: true}, policy) {
 		t.Fatal("plain group message should be ignored")
 	}
+	if !channels.ShouldHandle(channels.InboundMessage{IsGroup: true}, channels.Policy{RespondInGroups: "always"}) {
+		t.Fatal("always group policy should handle plain group message")
+	}
+	if channels.ShouldHandle(channels.InboundMessage{IsGroup: true, MentionsBot: true}, channels.Policy{RespondInGroups: "never"}) {
+		t.Fatal("never group policy should ignore group message")
+	}
 }
 
 func TestStripMentions(t *testing.T) {

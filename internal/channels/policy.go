@@ -10,7 +10,14 @@ func ShouldHandle(msg InboundMessage, policy Policy) bool {
 	if msg.IsDM {
 		return policy.RespondInDM
 	}
-	return msg.MentionsBot || msg.IsReplyToBot
+	switch strings.ToLower(strings.TrimSpace(policy.RespondInGroups)) {
+	case "always":
+		return true
+	case "never", "off", "false":
+		return false
+	default:
+		return msg.MentionsBot || msg.IsReplyToBot
+	}
 }
 
 func StripMentions(text string, mentions []string) string {
