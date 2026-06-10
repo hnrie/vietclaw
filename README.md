@@ -28,7 +28,11 @@ go run ./cmd/vietclaw chat "mày là gì"
 go run ./cmd/vietclaw memory add "Minh thích tiết kiệm token"
 go run ./cmd/vietclaw memory search "token"
 go run ./cmd/vietclaw harness create "fix failing login test"
+go run ./cmd/vietclaw harness run "fix failing login test"
 go run ./cmd/vietclaw harness list
+go run ./cmd/vietclaw harness show <run_id>
+go run ./cmd/vietclaw harness diff <run_id>
+go run ./cmd/vietclaw harness cleanup --passed
 go run ./cmd/vietclaw channels
 ```
 

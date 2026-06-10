@@ -100,6 +100,13 @@ CREATE TABLE IF NOT EXISTS harness_runs (
   model TEXT,
   summary TEXT,
   plan_json TEXT NOT NULL,
+  workspace_root TEXT,
+  worktree_path TEXT,
+  branch_name TEXT,
+  base_ref TEXT,
+  changed_files_json TEXT NOT NULL DEFAULT '[]',
+  final_diff TEXT,
+  failure_reason TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );

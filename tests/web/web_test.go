@@ -135,6 +135,37 @@ func TestHarnessRunsAPI(t *testing.T) {
 	if !strings.Contains(rec.Body.String(), "capsule.created") {
 		t.Fatalf("expected evidence event in detail: %s", rec.Body.String())
 	}
+
+	rec = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/api/harness/runs/"+created.ID+"/start", nil)
+	web.NewRouter(application).ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("start status = %d body = %s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), `"blocked"`) {
+		t.Fatalf("expected blocked non-git workspace: %s", rec.Body.String())
+	}
+
+	rec = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodGet, "/api/harness/runs/"+created.ID+"/diff", nil)
+	web.NewRouter(application).ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("diff status = %d body = %s", rec.Code, rec.Body.String())
+	}
+
+	rec = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/api/harness/runs/"+created.ID+"/cancel", nil)
+	web.NewRouter(application).ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("cancel status = %d body = %s", rec.Code, rec.Body.String())
+	}
+
+	rec = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/api/harness/runs/"+created.ID+"/cleanup", nil)
+	web.NewRouter(application).ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("cleanup status = %d body = %s", rec.Code, rec.Body.String())
+	}
 }
 
 func TestSettingsValidationRejectsInvalidConfig(t *testing.T) {

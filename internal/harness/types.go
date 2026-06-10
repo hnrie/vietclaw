@@ -4,8 +4,15 @@ type Status string
 
 const (
 	StatusPlanned       Status = "planned"
+	StatusRunning       Status = "running"
+	StatusLocalizing    Status = "localizing"
+	StatusPatching      Status = "patching"
+	StatusVerifying     Status = "verifying"
+	StatusPassed        Status = "passed"
 	StatusNeedsApproval Status = "needs_approval"
 	StatusFailed        Status = "failed"
+	StatusBlocked       Status = "blocked"
+	StatusCancelled     Status = "cancelled"
 )
 
 type Budget struct {
@@ -22,6 +29,7 @@ type PlanStep struct {
 	Checks      []string `json:"checks,omitempty"`
 	Name        string   `json:"name,omitempty"`
 	Detail      string   `json:"detail,omitempty"`
+	Action      string   `json:"action,omitempty"`
 }
 
 type Plan struct {
@@ -49,6 +57,13 @@ type Capsule struct {
 	Model          string   `json:"model,omitempty"`
 	Summary        string   `json:"summary,omitempty"`
 	Plan           Plan     `json:"plan"`
+	WorkspaceRoot  string   `json:"workspace_root,omitempty"`
+	WorktreePath   string   `json:"worktree_path,omitempty"`
+	BranchName     string   `json:"branch_name,omitempty"`
+	BaseRef        string   `json:"base_ref,omitempty"`
+	ChangedFiles   []string `json:"changed_files,omitempty"`
+	FinalDiff      string   `json:"final_diff,omitempty"`
+	FailureReason  string   `json:"failure_reason,omitempty"`
 	CreatedAt      string   `json:"created_at"`
 	UpdatedAt      string   `json:"updated_at"`
 }
@@ -71,6 +86,8 @@ type CreateRequest struct {
 	Goal           string   `json:"goal"`
 	Mode           string   `json:"mode,omitempty"`
 	Risk           string   `json:"risk,omitempty"`
+	WorkspaceRoot  string   `json:"workspace_root,omitempty"`
+	AutoRun        bool     `json:"auto_run,omitempty"`
 	MaxTokens      int      `json:"max_tokens,omitempty"`
 	MaxUSD         float64  `json:"max_usd,omitempty"`
 	MaxMinutes     int      `json:"max_minutes,omitempty"`
