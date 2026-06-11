@@ -66,8 +66,7 @@ Open **http://127.0.0.1:18636** — chat immediately (mock provider works out of
 Add a real model provider via environment variable and config (see [Configuration](#configuration)), or use the web UI **Công cụ nâng cao** drawer.
 
 ```sh
-go run ./cmd/vietclaw chat "Nhớ giúp t: t thích deploy bằng Docker"
-go run ./cmd/vietclaw memory search "Docker"
+go run ./cmd/vietclaw setup
 go run ./cmd/vietclaw status
 go run ./cmd/vietclaw doctor
 ```
@@ -143,18 +142,14 @@ Example agent profile:
 
 | Command | Description |
 | --- | --- |
+| `vietclaw version` | Print version and commit |
 | `vietclaw init` | Create data dir, config, database |
-| `vietclaw setup` | Interactive setup helper |
-| `vietclaw daemon` | Start HTTP daemon + channels |
-| `vietclaw status` | Runtime status |
+| `vietclaw setup` | Interactive first-time configuration |
+| `vietclaw daemon` | Start HTTP server and channels |
+| `vietclaw status` | Query running daemon |
 | `vietclaw doctor` | Health checks |
-| `vietclaw chat "<message>"` | One-shot chat |
-| `vietclaw memory list\|add\|search` | Memory management |
-| `vietclaw tools list` | Registered tools |
-| `vietclaw harness …` | Coding harness runs |
-| `vietclaw channels` | Channel status |
-| `vietclaw discord\|telegram enable\|disable` | Toggle adapters |
-| `vietclaw framework list` | Framework / registry info |
+
+Chat, memory, providers, and channels are configured via `setup` or the web UI — not separate CLI commands.
 
 ## Channels
 
@@ -165,7 +160,7 @@ Example agent profile:
 3. Set `VIETCLAW_DISCORD_TOKEN` and enable:
 
 ```sh
-vietclaw discord enable
+vietclaw setup   # enable Discord in the wizard, or edit config.json
 vietclaw daemon
 ```
 
@@ -177,7 +172,7 @@ In guilds, the bot responds on **mention or reply**. In DM, chat normally.
 2. Set `VIETCLAW_TELEGRAM_TOKEN` and enable:
 
 ```sh
-vietclaw telegram enable
+vietclaw setup   # enable Telegram in the wizard, or edit config.json
 vietclaw daemon
 ```
 

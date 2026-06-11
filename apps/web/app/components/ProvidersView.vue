@@ -1,49 +1,61 @@
 <script setup lang="ts">
-import type { ProviderConfig } from '~/types'
 import { apiFetch } from '~/utils/api'
-import { Server, Code, ToggleLeft, ToggleRight } from '@lucide/vue'
+import { Server, Code, Save } from '@lucide/vue'
 
 const toast = useToast()
-const providers = ref<ProviderConfig[]>([])
-const loading = ref(true)
+const { config, loading, saving, dirty, load, save } = useSettings()
+const modelLists = ref<Record<string, string[]>>({})
+const loadingModels = ref<Record<string, boolean>>({})
 
-async function fetchProviders() {
-  loading.value = true
+async function fetchModels(providerId: string) {
+  if (modelLists.value[providerId] || loadingModels.value[providerId]) return
+  loadingModels.value[providerId] = true
   try {
-    providers.value = await apiFetch<ProviderConfig[]>('/api/providers')
-  } catch (err) {
-    toast.add(err instanceof Error ? err.message : 'Failed to load providers', 'error')
+    const res = await apiFetch<{ models: string[] }>(`/api/providers/${providerId}/models`)
+    modelLists.value[providerId] = res.models || []
+  } catch {
+    toast.add('Không lấy được danh sách model', 'error')
   } finally {
-    loading.value = false
+    loadingModels.value[providerId] = false
   }
 }
 
-onMounted(fetchProviders)
+onMounted(async () => {
+  if (!config.value) await load()
+})
 </script>
 
 <template>
-  <div class="max-w-3xl mx-auto space-y-4">
-    <div class="flex items-center gap-2">
-      <Server :size="16" class="text-zinc-400" />
-      <h2 class="text-sm font-semibold text-zinc-200">Providers</h2>
-      <span class="text-[10px] text-zinc-500 font-mono">{{ providers.length }} configured</span>
+  <div class="mx-auto max-w-3xl space-y-4">
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <div class="flex items-center gap-2">
+        <Server :size="16" class="text-zinc-400" />
+        <h2 class="text-sm font-semibold text-zinc-200">Providers</h2>
+        <span v-if="config" class="text-[10px] text-zinc-500 font-mono">{{ config.providers.length }} configured</span>
+      </div>
+      <button
+        type="button"
+        class="flex items-center gap-1.5 rounded-md bg-zinc-100 px-3 py-1.5 text-[11px] font-semibold text-zinc-950 hover:bg-white disabled:opacity-40"
+        :disabled="saving || !dirty"
+        @click="save()"
+      >
+        <Save :size="12" />
+        Lưu
+      </button>
     </div>
 
-    <!-- Loading -->
     <div v-if="loading" class="space-y-3">
       <div v-for="i in 3" :key="i" class="h-24 rounded-lg bg-zinc-900/40 animate-pulse" />
     </div>
 
-    <!-- Empty -->
-    <div v-else-if="providers.length === 0" class="text-center py-16">
+    <div v-else-if="config && config.providers.length === 0" class="text-center py-16">
       <Server :size="32" class="mx-auto text-zinc-700 mb-3" />
-      <p class="text-xs text-zinc-500">No providers configured.</p>
+      <p class="text-xs text-zinc-500">Chưa có provider.</p>
     </div>
 
-    <!-- List -->
-    <div v-else class="space-y-2">
+    <div v-else-if="config" class="space-y-2">
       <div
-        v-for="p in providers"
+        v-for="p in config.providers"
         :key="p.id"
         class="rounded-lg border border-zinc-900 bg-zinc-950/40 p-4 hover:border-zinc-800 transition-colors"
       >
@@ -57,21 +69,54 @@ onMounted(fetchProviders)
               <p class="text-[10px] text-zinc-500 font-mono">{{ p.type }}</p>
             </div>
           </div>
-          <div class="flex items-center gap-1.5 px-2 py-1 rounded text-[10px] font-mono"
-            :class="p.enabled ? 'bg-emerald-950/30 text-emerald-400 border border-emerald-900/30' : 'bg-zinc-900 text-zinc-500 border border-zinc-800'"
-          >
-            <span class="w-1.5 h-1.5 rounded-full" :class="p.enabled ? 'bg-emerald-500' : 'bg-zinc-600'" />
+          <label class="flex items-center gap-2 text-[11px] text-zinc-400 shrink-0">
+            <input type="checkbox" v-model="p.enabled" class="rounded border-zinc-700" />
             {{ p.enabled ? 'active' : 'off' }}
-          </div>
+          </label>
         </div>
-        <div class="mt-3 pt-3 border-t border-zinc-900/60 grid grid-cols-2 gap-3">
+        <div class="mt-3 pt-3 border-t border-zinc-900/60 grid gap-3 sm:grid-cols-2">
           <div>
-            <span class="text-[10px] text-zinc-600 block mb-0.5">model</span>
-            <span class="text-[11px] text-zinc-300 font-mono">{{ p.default_model || 'not set' }}</span>
+            <span class="text-[10px] text-zinc-600 block mb-1">model</span>
+            <div class="flex gap-2">
+              <select
+                v-if="modelLists[p.id]?.length"
+                v-model="p.default_model"
+                class="flex-1 rounded border border-zinc-800 bg-zinc-950 px-2 py-1.5 text-[11px] font-mono text-zinc-300"
+              >
+                <option v-for="m in modelLists[p.id]" :key="m" :value="m">{{ m }}</option>
+              </select>
+              <input
+                v-else
+                v-model="p.default_model"
+                type="text"
+                class="flex-1 rounded border border-zinc-800 bg-zinc-950 px-2 py-1.5 text-[11px] font-mono text-zinc-300"
+              />
+              <button
+                type="button"
+                class="rounded border border-zinc-800 px-2 text-[10px] text-zinc-500 hover:text-zinc-300"
+                :disabled="loadingModels[p.id]"
+                @click="fetchModels(p.id)"
+              >
+                {{ loadingModels[p.id] ? '…' : 'models' }}
+              </button>
+            </div>
           </div>
           <div>
-            <span class="text-[10px] text-zinc-600 block mb-0.5">api key</span>
-            <span class="text-[11px] text-zinc-400 font-mono">{{ p.api_key_env ? `env:${p.api_key_env}` : 'not needed' }}</span>
+            <span class="text-[10px] text-zinc-600 block mb-1">api key env</span>
+            <input
+              v-model="p.api_key_env"
+              type="text"
+              placeholder="not needed"
+              class="w-full rounded border border-zinc-800 bg-zinc-950 px-2 py-1.5 text-[11px] font-mono text-zinc-400"
+            />
+          </div>
+          <div class="sm:col-span-2">
+            <span class="text-[10px] text-zinc-600 block mb-1">base url</span>
+            <input
+              v-model="p.base_url"
+              type="text"
+              class="w-full rounded border border-zinc-800 bg-zinc-950 px-2 py-1.5 text-[11px] font-mono text-zinc-400"
+            />
           </div>
         </div>
       </div>

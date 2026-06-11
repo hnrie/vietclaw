@@ -13,20 +13,12 @@ import (
 )
 
 const (
-	cmdVersion  = "version"
-	cmdInit     = "init"
-	cmdSetup    = "setup"
-	cmdDaemon   = "daemon"
-	cmdStatus   = "status"
-	cmdDoctor   = "doctor"
-	cmdChat     = "chat"
-	cmdMemory   = "memory"
-	cmdTools    = "tools"
-	cmdHarness  = "harness"
-	cmdChannels = "channels"
-	cmdDiscord  = "discord"
-	cmdTelegram  = "telegram"
-	cmdFramework = "framework"
+	cmdVersion = "version"
+	cmdInit    = "init"
+	cmdSetup   = "setup"
+	cmdDaemon  = "daemon"
+	cmdStatus  = "status"
+	cmdDoctor  = "doctor"
 )
 
 var (
@@ -63,22 +55,6 @@ func run(args []string) error {
 		return runStatus()
 	case cmdDoctor:
 		return runDoctor()
-	case cmdChat:
-		return runChat(args[2:])
-	case cmdMemory:
-		return runMemory(args[2:])
-	case cmdTools:
-		return runTools(args[2:])
-	case cmdHarness:
-		return runHarness(args[2:])
-	case cmdChannels:
-		return runChannels()
-	case cmdDiscord:
-		return runDiscord(args[2:])
-	case cmdTelegram:
-		return runTelegram(args[2:])
-	case cmdFramework:
-		return runFramework(args[2:])
 	case "help", "-h", "--help":
 		printUsage()
 		return nil
@@ -89,13 +65,18 @@ func run(args []string) error {
 
 func printUsage() {
 	fmt.Println(i18n.T(config.DefaultAgentLanguage, i18n.CLIUsage))
+	fmt.Println()
+	fmt.Println("Commands:")
+	fmt.Println("  version   Print version")
+	fmt.Println("  init      Create data dir, config, database")
+	fmt.Println("  setup     Interactive first-time configuration")
+	fmt.Println("  daemon    Start HTTP server and channels")
+	fmt.Println("  status    Query running daemon")
+	fmt.Println("  doctor    Health checks")
 }
 
 func loadEnvFiles() {
-	// 1. Load from current working directory
 	loadEnvFile(".env")
-
-	// 2. Load from data dir
 	if paths, err := config.DefaultPaths(); err == nil {
 		loadEnvFile(filepath.Join(paths.DataDir, ".env"))
 	}

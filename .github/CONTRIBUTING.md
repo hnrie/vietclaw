@@ -37,6 +37,7 @@ git clone https://github.com/vietclaw/vietclaw.git
 cd vietclaw
 
 go run ./cmd/vietclaw init
+go run ./cmd/vietclaw setup   # optional: configure provider & channels
 
 # Build embedded web UI (required for go build / full UI)
 cd apps/web

@@ -9,6 +9,11 @@ import (
 	"vietclaw/internal/db"
 )
 
+const (
+	channelDiscord  = "discord"
+	channelTelegram = "telegram"
+)
+
 func runDoctor() error {
 	paths, cfg, err := loadExistingConfig()
 	if err != nil {

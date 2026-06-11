@@ -24,7 +24,7 @@
   "system.summary_prefix": "Previous conversation summary:",
   "system.summarize_prompt": "Summarize the key points and flow of the conversation below in concise English for AI context. Return only the summary text, no preamble or formatting:\n\n%s",
   "system.skill_header": "Relevant skills:",
-  "cli.usage": "usage: vietclaw <version|init|setup|daemon|status|doctor|chat|memory|tools|harness|channels|framework|discord|telegram>",
+  "cli.usage": "usage: vietclaw <version|init|setup|daemon|status|doctor>",
   "cli.error_prefix": "error:",
   "cli.memory_saved": "ok, saved: %s",
   "tool.ui.agent_delegate": "Delegated agent",

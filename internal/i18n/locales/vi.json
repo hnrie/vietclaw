@@ -24,7 +24,7 @@
   "system.summary_prefix": "Tóm tắt hội thoại trước đó:",
   "system.summarize_prompt": "Tóm tắt ngắn gọn các ý chính và diễn biến cuộc hội thoại dưới đây bằng tiếng Việt để làm ngữ cảnh cho AI. Chỉ trả về văn bản tóm tắt ngắn gọn, không có thêm lời dẫn hay định dạng khác:\n\n%s",
   "system.skill_header": "Kỹ năng liên quan:",
-  "cli.usage": "usage: vietclaw <version|init|setup|daemon|status|doctor|chat|memory|tools|harness|channels|framework|discord|telegram>",
+  "cli.usage": "usage: vietclaw <version|init|setup|daemon|status|doctor>",
   "cli.error_prefix": "lỗi:",
   "cli.memory_saved": "ok, t lưu: %s",
   "tool.ui.agent_delegate": "Đã ủy agent",

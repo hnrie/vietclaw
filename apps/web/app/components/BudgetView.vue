@@ -1,69 +1,84 @@
 <script setup lang="ts">
-import type { BudgetStatus } from '~/types'
 import { apiFetch, formatMoney } from '~/utils/api'
-import { DollarSign } from '@lucide/vue'
+import { DollarSign, Save } from '@lucide/vue'
 
-const toast = useToast()
-const budget = ref<BudgetStatus | null>(null)
-const loading = ref(true)
+const { config, loading, saving, dirty, load, save } = useSettings()
+const todayCost = ref<number | null>(null)
 
-async function fetchBudget() {
-  loading.value = true
+async function fetchTodayCost() {
   try {
-    budget.value = await apiFetch<BudgetStatus>('/api/budget')
-  } catch (err) {
-    toast.add(err instanceof Error ? err.message : 'Failed to load budget', 'error')
-  } finally {
-    loading.value = false
+    const res = await apiFetch<{ total_cost_usd: number }>('/api/budget')
+    todayCost.value = res.total_cost_usd
+  } catch {
+    todayCost.value = null
   }
 }
 
-onMounted(fetchBudget)
+onMounted(async () => {
+  if (!config.value) await load()
+  await fetchTodayCost()
+})
 </script>
 
 <template>
-  <div class="max-w-3xl mx-auto space-y-4">
-    <div class="flex items-center gap-2">
-      <DollarSign :size="16" class="text-zinc-400" />
-      <h2 class="text-sm font-semibold text-zinc-200">Budget</h2>
+  <div class="mx-auto max-w-3xl space-y-4">
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <div class="flex items-center gap-2">
+        <DollarSign :size="16" class="text-zinc-400" />
+        <h2 class="text-sm font-semibold text-zinc-200">Budget</h2>
+      </div>
+      <button
+        type="button"
+        class="flex items-center gap-1.5 rounded-md bg-zinc-100 px-3 py-1.5 text-[11px] font-semibold text-zinc-950 hover:bg-white disabled:opacity-40"
+        :disabled="saving || !dirty"
+        @click="save()"
+      >
+        <Save :size="12" />
+        Lưu
+      </button>
     </div>
 
-    <!-- Loading -->
     <div v-if="loading" class="h-32 rounded-lg bg-zinc-900/40 animate-pulse" />
 
-    <!-- Content -->
-    <div v-else-if="budget" class="rounded-lg border border-zinc-900 bg-zinc-950/40 overflow-hidden">
-      <div class="px-5 py-4 border-b border-zinc-900/60 flex items-center justify-between">
+    <div v-else-if="config" class="rounded-lg border border-zinc-900 bg-zinc-950/40 overflow-hidden">
+      <div class="px-5 py-4 border-b border-zinc-900/60 flex flex-wrap items-center justify-between gap-2">
         <div class="flex items-center gap-2">
-          <span class="text-xs text-zinc-400">Policy</span>
-          <span class="px-1.5 py-0.5 rounded text-[9px] font-mono bg-emerald-950/30 text-emerald-400 border border-emerald-900/30">
-            {{ budget.cheap_first ? 'cheap first' : 'manual' }}
-          </span>
+          <span class="text-xs text-zinc-400">Router</span>
+          <label class="flex items-center gap-1.5 text-[10px] text-zinc-500">
+            <input type="checkbox" v-model="config.router.cheap_first" class="rounded border-zinc-700" />
+            cheap first
+          </label>
+          <label class="flex items-center gap-1.5 text-[10px] text-zinc-500">
+            <input type="checkbox" v-model="config.router.allow_escalation" class="rounded border-zinc-700" />
+            escalation
+          </label>
         </div>
-        <span class="text-[10px] text-zinc-600">
-          escalation {{ budget.allow_escalation ? 'enabled' : 'disabled' }}
+        <span v-if="todayCost !== null" class="text-[10px] font-mono text-zinc-500">
+          hôm nay {{ formatMoney(todayCost) }}
         </span>
       </div>
-      <div class="grid grid-cols-3 divide-x divide-zinc-900/60">
-        <div class="px-4 py-5 text-center">
-          <div class="text-[10px] font-medium text-zinc-500 uppercase tracking-wider mb-1.5">today</div>
-          <div class="text-lg font-bold tabular-nums text-zinc-100 font-mono">{{ formatMoney(budget.total_cost_usd) }}</div>
+      <div class="grid grid-cols-2 divide-x divide-zinc-900/60">
+        <div class="px-4 py-5">
+          <div class="text-[10px] font-medium text-zinc-500 uppercase tracking-wider mb-1.5">daily cap (USD)</div>
+          <input
+            v-model.number="config.budget.daily_usd_limit"
+            type="number"
+            min="0"
+            step="0.01"
+            class="w-full rounded border border-zinc-800 bg-zinc-950 px-2 py-1.5 text-lg font-bold font-mono text-zinc-100"
+          />
         </div>
-        <div class="px-4 py-5 text-center">
-          <div class="text-[10px] font-medium text-zinc-500 uppercase tracking-wider mb-1.5">daily cap</div>
-          <div class="text-lg font-bold tabular-nums text-zinc-100 font-mono">{{ formatMoney(budget.daily_usd_limit) }}</div>
-        </div>
-        <div class="px-4 py-5 text-center">
-          <div class="text-[10px] font-medium text-zinc-500 uppercase tracking-wider mb-1.5">approval</div>
-          <div class="text-lg font-bold tabular-nums text-zinc-100 font-mono">{{ formatMoney(budget.require_approval_above_usd) }}</div>
+        <div class="px-4 py-5">
+          <div class="text-[10px] font-medium text-zinc-500 uppercase tracking-wider mb-1.5">approval above (USD)</div>
+          <input
+            v-model.number="config.budget.require_approval_above_usd"
+            type="number"
+            min="0"
+            step="0.01"
+            class="w-full rounded border border-zinc-800 bg-zinc-950 px-2 py-1.5 text-lg font-bold font-mono text-zinc-100"
+          />
         </div>
       </div>
-    </div>
-
-    <!-- Empty -->
-    <div v-else class="text-center py-16">
-      <DollarSign :size="32" class="mx-auto text-zinc-700 mb-3" />
-      <p class="text-xs text-zinc-500">No budget data available.</p>
     </div>
   </div>
 </template>

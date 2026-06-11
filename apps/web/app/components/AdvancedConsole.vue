@@ -7,18 +7,22 @@ defineEmits<{ close: [] }>()
 const tabs = [
   { id: 'sessions', label: 'Phiên', icon: History },
   { id: 'memory', label: 'Memory', icon: Database },
+  { id: 'settings', label: 'Cài đặt', icon: Sliders },
   { id: 'providers', label: 'Providers', icon: Server },
   { id: 'budget', label: 'Budget', icon: DollarSign },
   { id: 'channels', label: 'Kênh', icon: Radio },
   { id: 'logs', label: 'Logs', icon: FileText },
-  { id: 'system', label: 'Hệ thống', icon: Sliders },
 ] as const
 
 const activeTab = ref<string>('memory')
 const { status, framework, online, refresh } = useDaemon()
+const { load: loadSettings, dirty, saving, save } = useSettings()
 
 watch(() => props.open, (v) => {
-  if (v) refresh()
+  if (v) {
+    refresh()
+    void loadSettings()
+  }
 })
 </script>
 
@@ -31,11 +35,32 @@ watch(() => props.open, (v) => {
           <header class="flex items-center justify-between border-b border-zinc-800 px-5 py-4">
             <div>
               <h2 class="text-sm font-semibold text-zinc-100">Công cụ nâng cao</h2>
-              <p class="text-[11px] text-zinc-500">Không bắt buộc — chat là đủ cho hầu hết việc.</p>
+              <p class="text-[11px] text-zinc-500">
+                <span
+                  class="inline-flex items-center gap-1.5"
+                  :class="online ? 'text-emerald-400/80' : 'text-zinc-500'"
+                >
+                  <span class="h-1.5 w-1.5 rounded-full" :class="online ? 'bg-emerald-500' : 'bg-zinc-600'" />
+                  {{ online ? 'Daemon online' : 'Chưa kết nối' }}
+                </span>
+                <span v-if="status?.version" class="text-zinc-600"> · {{ status.version }}</span>
+              </p>
             </div>
-            <button class="rounded p-1.5 text-zinc-500 hover:bg-zinc-900 hover:text-zinc-300" @click="$emit('close')">
-              <X :size="18" />
-            </button>
+            <div class="flex items-center gap-2">
+              <span v-if="dirty" class="text-[10px] text-amber-400/90">Chưa lưu</span>
+              <button
+                v-if="dirty"
+                type="button"
+                class="rounded-md bg-zinc-100 px-2.5 py-1 text-[11px] font-semibold text-zinc-950 hover:bg-white disabled:opacity-40"
+                :disabled="saving"
+                @click="save()"
+              >
+                Lưu
+              </button>
+              <button class="rounded p-1.5 text-zinc-500 hover:bg-zinc-900 hover:text-zinc-300" @click="$emit('close')">
+                <X :size="18" />
+              </button>
+            </div>
           </header>
 
           <div class="flex gap-1 overflow-x-auto border-b border-zinc-800/80 px-4 py-2 vc-scrollbar">
@@ -58,6 +83,9 @@ watch(() => props.open, (v) => {
             <div v-else-if="activeTab === 'memory'">
               <MemoryView />
             </div>
+            <div v-else-if="activeTab === 'settings'">
+              <SettingsView />
+            </div>
             <div v-else-if="activeTab === 'providers'">
               <ProvidersView />
             </div>
@@ -70,35 +98,11 @@ watch(() => props.open, (v) => {
             <div v-else-if="activeTab === 'logs'">
               <LogsView />
             </div>
-            <div v-else-if="activeTab === 'system'" class="space-y-4 max-w-lg">
-              <div class="rounded-lg border border-zinc-800 bg-zinc-900/30 p-4">
-                <div class="flex items-center gap-2 text-xs">
-                  <span
-                    class="h-2 w-2 rounded-full"
-                    :class="online ? 'bg-emerald-500' : 'bg-rose-500'"
-                  />
-                  <span class="text-zinc-300">{{ online ? 'Daemon đang chạy' : 'Không kết nối daemon' }}</span>
-                </div>
-                <dl class="mt-3 space-y-2 text-[11px] font-mono text-zinc-400">
-                  <div class="flex justify-between gap-4"><dt>version</dt><dd class="text-zinc-200">{{ status?.version || '—' }}</dd></div>
-                  <div class="flex justify-between gap-4"><dt>uptime</dt><dd class="text-zinc-200">{{ status?.uptime || '—' }}</dd></div>
-                  <div class="flex justify-between gap-4"><dt>mode</dt><dd class="text-zinc-200">{{ status?.mode || '—' }}</dd></div>
-                </dl>
-              </div>
-              <div class="rounded-lg border border-zinc-800 bg-zinc-900/30 p-4 text-[11px] text-zinc-400">
-                <p class="mb-2 font-medium text-zinc-300">Agent framework</p>
-                <ul class="space-y-1 font-mono">
-                  <li>delegate: {{ framework?.delegate_enabled ? 'on' : 'off' }}</li>
-                  <li>hooks: {{ framework?.hooks_enabled ? 'on' : 'off' }} ({{ framework?.hooks_registered ?? 0 }})</li>
-                  <li>agents: {{ framework?.agents?.length ?? 0 }}</li>
-                </ul>
-              </div>
-              <p class="text-[11px] leading-relaxed text-zinc-500">
-                Cấu hình server: chỉnh <code class="text-zinc-400">config.json</code> trong data dir hoặc dùng CLI
-                <code class="text-zinc-400">vietclaw doctor</code>. UI chat không cần cấu hình thêm.
-              </p>
-            </div>
           </div>
+
+          <footer v-if="framework && activeTab === 'settings'" class="border-t border-zinc-800/80 px-5 py-2 text-[10px] text-zinc-600 font-mono">
+            framework: delegate {{ framework.delegate_enabled ? 'on' : 'off' }} · hooks {{ framework.hooks_enabled ? 'on' : 'off' }} ({{ framework.hooks_registered ?? 0 }})
+          </footer>
         </aside>
       </div>
     </Transition>
