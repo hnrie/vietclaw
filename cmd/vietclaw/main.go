@@ -27,6 +27,7 @@ const (
 	cmdDiscord  = "discord"
 	cmdTelegram  = "telegram"
 	cmdFramework = "framework"
+	cmdWebSearch = "websearch"
 )
 
 var (
@@ -79,6 +80,8 @@ func run(args []string) error {
 		return runTelegram(args[2:])
 	case cmdFramework:
 		return runFramework(args[2:])
+	case cmdWebSearch:
+		return runWebSearch(args[2:])
 	case "help", "-h", "--help":
 		printUsage()
 		return nil

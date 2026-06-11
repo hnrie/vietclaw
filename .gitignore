@@ -13,3 +13,7 @@ apps/web/.nuxt/
 apps/web/.output/
 apps/web/dist/
 scratch/
+open-websearch/node_modules/
+open-websearch/build/
+open-websearch/*.log
+open-websearch/.env*
