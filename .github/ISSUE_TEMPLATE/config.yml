@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/vietclaw/vietclaw/security/advisories/new
+    about: Report a security issue privately (do not open a public issue)
+  - name: Contributing guide
+    url: https://github.com/vietclaw/vietclaw/blob/master/.github/CONTRIBUTING.md
+    about: Development setup, tests, and pull request guidelines
