@@ -10,6 +10,10 @@ Single Go binary · SQLite · embedded web UI · Discord & Telegram · built-in 
 
 ---
 
+## Documentation
+
+In-depth guides live in **[docs/](docs/README.md)** — configuration reference, HTTP API, tools, agents, memory, channels, harness, and architecture.
+
 ## Table of contents
 
 - [Why VietClaw](#why-vietclaw)
@@ -235,6 +239,7 @@ See [CONTRIBUTING.md](.github/CONTRIBUTING.md) for PR workflow, code style, and 
 ## Project structure
 
 ```
+docs/                  In-depth documentation
 cmd/vietclaw/          CLI entrypoint
 internal/agent/        Agent loop, profiles, delegation
 internal/tools/        Tool registry and implementations
